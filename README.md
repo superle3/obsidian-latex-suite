@@ -1,4 +1,7 @@
-# Obsidian Latex Suite <img src="https://img.shields.io/github/manifest-json/v/artisticat1/obsidian-latex-suite"> <img src="https://img.shields.io/github/downloads/artisticat1/obsidian-latex-suite/total">
+# Disclaimer
+This branch temporarily implements https://github.com/artisticat1/obsidian-latex-suite/pull/421, https://github.com/artisticat1/obsidian-latex-suite/pull/416 https://github.com/artisticat1/obsidian-latex-suite/pull/398 https://github.com/artisticat1/obsidian-latex-suite/pull/386 and https://github.com/artisticat1/obsidian-latex-suite/pull/359. Where the vim support and concealment are the most important ones. This branch is not maintained in any way and any issues that arises with the original pr's can be mentioned in those. This is not meant to replace the plugin in any way, just vim support before the original maintainer can review the pr's.
+
+# (Original README) Obsidian Latex Suite <img src="https://img.shields.io/github/manifest-json/v/artisticat1/obsidian-latex-suite"> <img src="https://img.shields.io/github/downloads/artisticat1/obsidian-latex-suite/total">
 
 A plugin for Obsidian that aims to make typesetting LaTeX math as fast as handwriting.
 
