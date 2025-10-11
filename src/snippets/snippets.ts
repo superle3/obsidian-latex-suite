@@ -1,6 +1,8 @@
 import { SelectionRange } from "@codemirror/state";
 import { Options } from "./options";
 import { Environment } from "./environment";
+import * as language from "@codemirror/language";
+import { EditorView } from "codemirror";
 
 /**
  * in visual snippets, if the replacement is a string, this is the magic substring to indicate the selection.
@@ -28,15 +30,15 @@ export type SnippetType =
 export type SnippetData<T extends SnippetType> = {
 	visual: {
 		trigger: string;
-		replacement: string | ((selection: string) => string | false);
+		replacement: string | ((selection: string, codemirror?: any) => string | false);
 	};
 	regex: {
 		trigger: RegExp;
-		replacement: string | ((match: RegExpExecArray) => string);
+		replacement: string | ((match: RegExpExecArray, codemirror?: any) => string);
 	};
 	string: {
 		trigger: string;
-		replacement: string | ((match: string) => string);
+		replacement: string | ((match: string, codemirror?: any) => string);
 	};
 }[T]
 
@@ -80,7 +82,7 @@ export abstract class Snippet<T extends SnippetType = SnippetType> {
 	get trigger(): SnippetData<T>["trigger"] { return this.data.trigger; }
 	get replacement(): SnippetData<T>["replacement"] { return this.data.replacement; }
 
-	abstract process(effectiveLine: string, range: SelectionRange, sel: string): ProcessSnippetResult;
+	abstract process(effectiveLine: string, range: SelectionRange, sel: string, view?: EditorView): ProcessSnippetResult;
 
 	toString() {
 		return serializeSnippetLike({
@@ -130,7 +132,7 @@ export class RegexSnippet extends Snippet<"regex"> {
 		super("regex", trigger, replacement, options, priority, description, excludedEnvironments);
 	}
 
-	process(effectiveLine: string, range: SelectionRange, sel: string): ProcessSnippetResult {
+	process(effectiveLine: string, range: SelectionRange, sel: string, view: EditorView): ProcessSnippetResult {
 		const hasSelection = !!sel;
 		// non-visual snippets only run when there is no selection
 		if (hasSelection) { return null; }
@@ -153,7 +155,8 @@ export class RegexSnippet extends Snippet<"regex"> {
 					this.replacement
 				);
 		} else {
-			replacement = this.replacement(result);
+			console.log(effectiveLine, this.trigger)
+			replacement = this.replacement(result, {view, ...codemirror});
 
 			// sanity check - if this.replacement was a function,
 			// we have no way to validate beforehand that it really does return a string
@@ -164,6 +167,9 @@ export class RegexSnippet extends Snippet<"regex"> {
 	}
 }
 
+const codemirror = {
+	language
+}
 export class StringSnippet extends Snippet<"string"> {
 	data: SnippetData<"string">;
 
@@ -171,7 +177,7 @@ export class StringSnippet extends Snippet<"string"> {
 		super("string", trigger, replacement, options, priority, description, excludeIn);
 	}
 
-	process(effectiveLine: string, range: SelectionRange, sel: string): ProcessSnippetResult {
+	process(effectiveLine: string, range: SelectionRange, sel: string, view: EditorView): ProcessSnippetResult {
 		const hasSelection = !!sel;
 		// non-visual snippets only run when there is no selection
 		if (hasSelection) { return null; }
@@ -182,12 +188,11 @@ export class StringSnippet extends Snippet<"string"> {
 		const triggerPos = effectiveLine.length - this.trigger.length;
 		const replacement = typeof this.replacement === "string"
 			? this.replacement
-			: this.replacement(this.trigger);
+			: this.replacement(this.trigger, {...codemirror, view});
 
 		// sanity check - if replacement was a function,
 		// we have no way to validate beforehand that it really does return a string
 		if (typeof replacement !== "string") { return null; }
-
 		return { triggerPos, replacement };
 	}
 }

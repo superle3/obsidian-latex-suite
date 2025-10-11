@@ -36,6 +36,7 @@ const runSnippetCursor = (view: EditorView, ctx: Context, key: string, range: Se
 	const sel = view.state.sliceDoc(from, to);
 	const line = view.state.sliceDoc(0, to);
 	const updatedLine = line + key;
+	console.log(line, "line")
 	for (const snippet of settings.snippets) {
 		let effectiveLine = line;
 
@@ -64,7 +65,7 @@ const runSnippetCursor = (view: EditorView, ctx: Context, key: string, range: Se
 		// but labels are extremely rarely used, so we do this construction instead
 		if (isExcluded) { continue; }
 
-		const result = snippet.process(effectiveLine, range, sel);
+		const result = snippet.process(effectiveLine, range, sel, view);
 		if (result === null) continue;
 		const triggerPos = result.triggerPos;
 
