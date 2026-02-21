@@ -1,12 +1,13 @@
 import LatexSuitePlugin from "../main";
 import { Vault, TFile, TFolder, TAbstractFile, Notice, debounce } from "obsidian";
 import { Snippet } from "../snippets/snippets";
-import { parseSnippets, parseSnippetVariables, type SnippetVariables } from "../snippets/parse";
+import { JavscriptSourceCode, parseSnippets, parseSnippetVariables, type SnippetVariables } from "../snippets/parse";
 // @ts-ignore
 import differenceImplementation from "set.prototype.difference";
 // @ts-ignore
 import intersectionImplementation from "set.prototype.intersection";
 import { sortSnippets } from "src/snippets/sort";
+import { error } from "console";
 
 const difference: <T>(self: Set<T>, other: Set<T>) => Set<T> = differenceImplementation;
 const intersection: <T>(self: Set<T>, other: Set<T>) => Set<T> = intersectionImplementation;
@@ -126,8 +127,12 @@ export async function getVariablesFromFiles(plugin: LatexSuitePlugin, files: Fil
 
 	for (const file of files.definitelyVariableFiles) {
 		const content = await plugin.app.vault.cachedRead(file);
+		const sourceFile: JavscriptSourceCode = {
+			sourceCode: content,
+			filePath: file.path,
+		};
 		try {
-			Object.assign(snippetVariables, await parseSnippetVariables(content));
+			Object.assign(snippetVariables, await parseSnippetVariables(sourceFile));
 		} catch (e) {
 			new Notice(`Failed to parse variable file ${file.name}: ${e}`);
 			console.error(`Failed to parse variable file ${file.name}: ${e}`);
@@ -143,8 +148,12 @@ export async function tryGetVariablesFromUnknownFiles(plugin: LatexSuitePlugin, 
 
 	for (const file of files.snippetOrVariableFiles) {
 		const content = await plugin.app.vault.cachedRead(file);
+		const sourceFile: JavscriptSourceCode = {
+			sourceCode: content,
+			filePath: file.path,
+		};
 		try {
-			Object.assign(snippetVariables, await parseSnippetVariables(content));
+			Object.assign(snippetVariables, await parseSnippetVariables(sourceFile));
 			files.definitelyVariableFiles.add(file);
 		} catch (e) {
 			// No error here, we just assume this is a snippets file.
@@ -166,13 +175,22 @@ export async function getSnippetsFromFiles(
 
 	for (const file of files.definitelySnippetFiles) {
 		const content = await plugin.app.vault.cachedRead(file);
-		try {
-			snippets.push(...await parseSnippets(content, snippetVariables));
-		} catch (e) {
-			new Notice(`Failed to parse snippet file ${file.name}: ${e}`);
-			console.error(`Failed to parse snippet file ${file.name}: ${e}`);
-			files.definitelySnippetFiles.delete(file);
+		const result = await parseSnippets({sourceCode: content, filePath: file.path}, snippetVariables);
+		if (result.success) {
+			snippets.push(...result.value);
+			continue;
 		}
+		if (result.error instanceof Error) {
+			// new Notice(`Failed to parse snippet file ${file.name}: ${result.error.message}`);
+			// console.error(`Failed to parse snippet file ${file.name}: ${result.error.message}`);
+			new Notice(`Failed to parse snippet file ${file.name}: ${result.error.stack?.split("\n").join(" ")}`);
+			console.log([result.error.stack], result.error instanceof Error);
+			continue;
+		}	
+		new Notice(`Failed to parse snippet file ${file.name}: ${result.error}`);
+		// console.error(`Failed to parse snippet file ${file.name}: ${result.error}`);
+		console.error(`Failed to parse snippet file ${file.name}`,result.error);
+		files.definitelySnippetFiles.delete(file);
 	}
 
 	return sortSnippets(snippets);

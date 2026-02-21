@@ -52,8 +52,8 @@ export abstract class Snippet<T extends SnippetType = SnippetType> {
 	type: T;
 	data: SnippetData<T>;
 	options: Options;
-	priority?: number;
-	description?: string;
+	priority: number;
+	description: string;
 
 	excludedEnvironments: Environment[];
 
@@ -62,8 +62,8 @@ export abstract class Snippet<T extends SnippetType = SnippetType> {
 		trigger: SnippetData<T>["trigger"],
 		replacement: SnippetData<T>["replacement"],
 		options: Options,
-		priority?: number | undefined,
-		description?: string | undefined,
+		priority: number = 0,
+		description: string = "no description",
 		excludedEnvironments?: Environment[],
 	) {
 		this.type = type;

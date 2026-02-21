@@ -1,7 +1,7 @@
 import { EditorState, Extension } from "@codemirror/state";
 import { EditorView, ViewUpdate } from "@codemirror/view";
 import { App, ButtonComponent, ExtraButtonComponent, Modal, Platform, PluginSettingTab, Setting, debounce, setIcon } from "obsidian";
-import { parseSnippetVariables, parseSnippets } from "src/snippets/parse";
+import { JavscriptSourceCode, parseSnippetVariables, parseSnippets } from "src/snippets/parse";
 import { DEFAULT_SNIPPETS } from "src/utils/default_snippets";
 import LatexSuitePlugin from "../main";
 import { DEFAULT_SETTINGS } from "./settings";
@@ -598,8 +598,14 @@ export class LatexSuiteSettingTab extends PluginSettingTab {
 
 				let snippetVariables;
 				try {
-					snippetVariables = await parseSnippetVariables(this.plugin.settings.snippetVariables)
-					await parseSnippets(snippets, snippetVariables);
+					const sourceFile: JavscriptSourceCode = {
+						sourceCode: snippets,
+					}
+					snippetVariables = await parseSnippetVariables(sourceFile);
+					if (!snippetVariables.success) {
+						throw snippetVariables.error;
+					}
+					await parseSnippets({sourceCode: snippets}, snippetVariables.value);
 				}
 				catch (e) {
 					success = false;

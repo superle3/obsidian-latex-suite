@@ -7,7 +7,7 @@ import { ICONS } from "./settings/ui/icons";
 
 import { getEditorCommands } from "./features/editor_commands";
 import { getLatexSuiteConfigExtension } from "./snippets/codemirror/config";
-import { SnippetVariables, parseSnippetVariables, parseSnippets } from "./snippets/parse";
+import { JavscriptSourceCode, SnippetVariables, parseSnippetVariables, parseSnippets } from "./snippets/parse";
 import { handleUpdate, onInput, keyboardEventPlugin } from "./latex_suite";
 import { EditorView, tooltips } from "@codemirror/view";
 import { snippetExtensions } from "./snippets/codemirror/extensions";
@@ -114,23 +114,37 @@ export default class LatexSuitePlugin extends Plugin {
 	}
 
 	async getSettingsSnippetVariables() {
-		try {
-			return await parseSnippetVariables(this.settings.snippetVariables);
-		} catch (e) {
-			new Notice(`Failed to load snippet variables from settings: ${e}`);
-			console.error(`Failed to load snippet variables from settings: ${e}`);
-			return {};
+		const sourceFile: JavscriptSourceCode = {
+			sourceCode: this.settings.snippetVariables,
+			filePath: this.settings.loadSnippetVariablesFromFile
+				? this.settings.snippetVariablesFileLocation
+				: undefined,
+		};
+		const result = await parseSnippetVariables(sourceFile);
+		if (result.success) {
+			return result.value;
 		}
+		new Notice(`Failed to load snippet variables from settings: ${result.error}`);
+		console.error(`Failed to load snippet variables from settings: ${result.error}`);
+		return {};
 	}
 
 	async getSettingsSnippets(snippetVariables: SnippetVariables) {
-		try {
-			return await parseSnippets(this.settings.snippets, snippetVariables);
-		} catch (e) {
-			new Notice(`Failed to load snippets from settings: ${e}`);
-			console.error(`Failed to load snippets from settings: ${e}`);
-			return [];
+		const result = await parseSnippets(
+			{
+				sourceCode: this.settings.snippets,
+				filePath: this.settings.loadSnippetsFromFile
+					? this.settings.snippetsFileLocation
+					: undefined,
+			},
+			snippetVariables,
+		);
+		if (result.success) {
+			return result.value;
 		}
+		new Notice(`Failed to load snippets from settings: ${result.error}`);
+		console.error(`Failed to load snippets from settings: ${result.error}`);
+		return [];
 	}
 
 	async getSnippets(becauseFileLocationUpdated: boolean, becauseFileUpdated: boolean) {
