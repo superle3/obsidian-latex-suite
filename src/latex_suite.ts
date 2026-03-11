@@ -15,6 +15,7 @@ import { handleUndoRedo } from "./snippets/codemirror/history";
 import { handleMathTooltip } from "./editor_extensions/math_tooltip";
 import { isComposing, forceEndComposition } from "./utils/editor_utils";
 import { LatexSuiteCMSettings } from "./settings/settings";
+import { Snippet } from "./snippets/snippets";
 
 export const handleUpdate = (update: ViewUpdate) => {
 	const settings = getLatexSuiteConfig(update.state);
@@ -141,10 +142,11 @@ export function getKeymaps(settings: LatexSuiteCMSettings): LatexSuiteKeyBinding
 	const runMaker = (key: string) => {
 		const snippets = settings.snippets.filter(
 			(s) =>
-				s.triggerKey === key ||
-				(!s.triggerKey &&
-					!s.options.automatic &&
-					key === settings.snippetsTrigger),
+				!s.options.visual &&
+				(s.triggerKey === key ||
+					(!s.triggerKey &&
+						!s.options.automatic &&
+						key === settings.snippetsTrigger)),
 		);
 		return (view: EditorView) => {
 			const settings = getLatexSuiteConfig(view);
@@ -161,6 +163,37 @@ export function getKeymaps(settings: LatexSuiteCMSettings): LatexSuiteKeyBinding
 			}
 		};
 	};
+	const visualRun = (snippets: Snippet[]) => (view: EditorView) => {
+		console.log(1)
+		const settings = getLatexSuiteConfig(view);
+		// Prevent IME from triggering keydown events.
+		if (settings.suppressSnippetTriggerOnIME && view.composing)
+			return false;
+		try {
+			const ctx = getContextPlugin(view);
+			return runSnippets(view, ctx, { snippets }, settings.snippetDebug);
+		} catch (e) {
+			clearSnippetQueue(view);
+			console.error(e);
+			return false;
+		}
+	};	
+	const visualSnippets: KeyBinding[] = settings.snippets
+		.filter((s) => s.options.visual)
+		.flatMap((s: Snippet<"visual">): KeyBinding | KeyBinding[] => {
+			const keys = [];
+			if (s.trigger.length === 1) {
+				keys.push(s.trigger.toLowerCase(), s.trigger.toUpperCase());
+			} else if (s.trigger.length > 1) {
+				keys.push(s.trigger);
+			} else if (s.triggerKey){
+				keys.push(s.triggerKey);
+			}
+			return keys.map((key) => ({
+				key,
+				run: visualRun([s]),
+			}));
+		});
 	if (settings.snippetsEnabled) {
 		keybindings.push(
 			...Array.from(snippet_triggers, (key) => {
@@ -168,7 +201,8 @@ export function getKeymaps(settings: LatexSuiteCMSettings): LatexSuiteKeyBinding
 					key,
 					run: runMaker(key),
 				};
-			})
+			}),
+			...visualSnippets
 		);
 	}
 

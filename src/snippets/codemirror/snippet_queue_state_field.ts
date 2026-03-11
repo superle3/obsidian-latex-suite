@@ -29,12 +29,12 @@ export function getSnippetQueue(view: EditorView) {
 }
 
 
-export function queueSnippet(view: EditorView, from: number, to: number, insert: string, keyPressed?: string) {
-	const snippet = new SnippetChangeSpec(from, to, keepIndentAndCallout(view.state, from, to, insert), keyPressed);
+export function queueSnippet(view: EditorView, from: number, to: number, insert: string, keyPressed: string | undefined = undefined, replaceCallout: boolean = false) {
+	const snippet = new SnippetChangeSpec(from, to, keepIndentAndCallout(view.state, from, to, insert, replaceCallout), keyPressed);
 	getSnippetQueue(view).QueueSnippets([snippet]);
 }
 
-const keepIndentAndCallout = (state: EditorState,from: number, to: number, replacement: string): string => {
+const keepIndentAndCallout = (state: EditorState,from: number, to: number, replacement: string, replaceCallout: boolean): string => {
 	const line = state.doc.lineAt(to);
 	const lineText = line.text;
 	const calloutAndIndent = lineText.match(/^(>*)(\s*)/);
@@ -44,7 +44,8 @@ const keepIndentAndCallout = (state: EditorState,from: number, to: number, repla
 	const originalColIndent = countColumn(indentation, state.tabSize);
 	const indentUnitSize = getIndentUnit(state);
 	const misalignment = originalColIndent % indentUnitSize;
-	replacement = replacement.replace(/\n(\t*)/g, (_, p1) => {
+	const regex = replaceCallout ? /\n(?! {0,3}>)(\t*)/g : /\n(\t*)(?=\s*\S)/g;
+	replacement = replacement.replace(regex, (_, p1) => {
 		// not preserving misalignment when indent level is increased
 		const newColIndent =
 			p1.length * indentUnitSize +
@@ -53,6 +54,9 @@ const keepIndentAndCallout = (state: EditorState,from: number, to: number, repla
 		const indent = indentString(state, newColIndent);
 		return "\n" + callouts + indent;
 	});
+	if (from === 0 || state.doc.sliceString(from-1,from) === "\n") {
+		replacement = callouts + indentation + replacement;
+	}
 
 	return replacement;
 }
