@@ -1,5 +1,5 @@
 import { EditorView } from "@codemirror/view";
-import { ChangeSet, EditorSelection } from "@codemirror/state";
+import { ChangeSet, EditorSelection, StateEffect } from "@codemirror/state";
 import { endSnippet, startSnippet } from "./codemirror/history";
 import { isolateHistory } from "@codemirror/commands";
 import { TabstopSpec, tabstopSpecsToTabstopGroups } from "./tabstop";
@@ -17,12 +17,13 @@ export function expandSnippets(view: EditorView):boolean {
 	// Try to apply changes all at once, because `view.dispatch` gets expensive for large documents
 	const undoChanges = handleUndoKeypresses(view, snippetsToExpand);
 	// If from===to, normally the cursor would be before the text, but after the text makes more sense as that happens when from <to.
-	const selection = view.state.selection.map(undoChanges, 1);
-	const newText = undoChanges.apply(view.state.doc).toString();
+	const selection = view.state.selection.map(undoChanges.changes, 1);
+	const keypressChangeSet = ChangeSet.of(undoChanges.keyPresses, view.state.doc.length)
+	const newText = undoChanges.changes.apply(keypressChangeSet.apply(view.state.doc)).toString();
 	const tabstopsToAdd = computeTabstops(newText, snippetsToExpand, originalDocLength);
 	const changes = {
-		changes: undoChanges,
-		selection: selection
+		...undoChanges,
+		selection: selection,
 	}
 
 	// Insert any tabstops
@@ -56,12 +57,14 @@ function handleUndoKeypresses(view: EditorView, snippets: SnippetChangeSpec[]) {
 	// Insert the keypresses
 	// Use isolateHistory to allow users to undo the triggering of a snippet,
 	// but keep the text inserted by the trigger key
-	if (keyPresses.length > 0) {
-		view.dispatch({
-			changes: keyPresses,
-			annotations: isolateHistory.of("full"),
-		});
-	}
+	// if (keyPresses.length > 0) {
+	// 	view.dispatch({
+	// 		changes: keyPresses,
+	// 		annotations: isolateHistory.of("full"),
+	// 	});
+	// }
+	
+
 
 	// Undo the keypresses, and insert the replacements
 	const undoKeyPresses = ChangeSet.of(keyPresses, originalDocLength).invert(originalDoc);
@@ -69,7 +72,7 @@ function handleUndoKeypresses(view: EditorView, snippets: SnippetChangeSpec[]) {
 	const combinedChanges = undoKeyPresses.compose(changesAsChangeSet);
 
 	// Mark the transaction as the beginning of a snippet (for undo/history purposes)
-	return combinedChanges;
+	return { changes: combinedChanges, keyPresses};
 }
 
 function computeTabstops(text: string, snippets: SnippetChangeSpec[], originalDocLength: number) {
@@ -91,7 +94,8 @@ function expandTabstops(
 	tabstops: TabstopSpec[],
 	undoChanges: {
 		changes:ChangeSet,
-		selection: EditorSelection
+		selection: EditorSelection,
+		keyPresses: {from: number,to: number, insert: string}[]
 	},
 	newLength: number
 ) {
@@ -120,7 +124,7 @@ function expandTabstops(
 		sequential: true
 	};
 	view.dispatch({
-		effects: [...effects, startSnippet.of(extraTabstopGroups)],
+		effects: [...effects, startSnippet.of({tabstopGroups: extraTabstopGroups, keypresses: undoChanges.keyPresses})],
 		changes: undoChanges.changes.compose(changes),
 		selection: undoChanges.selection
 	}, spec);

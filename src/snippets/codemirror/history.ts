@@ -1,14 +1,18 @@
 import { ViewUpdate } from "@codemirror/view";
-import { StateEffect } from "@codemirror/state";
+import { ChangeDesc, StateEffect } from "@codemirror/state";
 import { invertedEffects } from "@codemirror/commands";
 import { addTabstops, removeAllTabstops } from "./tabstops_state_field";
 import { TabstopGroup } from "../tabstop";
 
 // Effects that mark the beginning and end of transactions to insert snippets
 
-export const startSnippet = StateEffect.define<TabstopGroup[]>();
+type StartSnippet = {
+	tabstopGroups: TabstopGroup[],
+	keypresses: {from: number, to: number, insert: string}[]
+}
+export const startSnippet = StateEffect.define<StartSnippet>();
 export const endSnippet = StateEffect.define();
-export const undidStartSnippet = StateEffect.define<TabstopGroup[]>();
+export const undidStartSnippet = StateEffect.define<StartSnippet>();
 export const undidEndSnippet = StateEffect.define();
 
 
@@ -42,10 +46,15 @@ export const handleUndoRedo = (update: ViewUpdate) => {
 
 	for (const tr of update.transactions) {
 		for (const effect of tr.effects) {
+			if (effect.is(startSnippet) && undoTr) {
+				update.view.dispatch({
+					changes: effect.value.keypresses
+				})
+			}
 
 			if (effect.is(startSnippet) && redoTr) {
 				update.view.dispatch({
-					effects: addTabstops(effect.value).effects,
+					effects: addTabstops(effect.value.tabstopGroups).effects,
 				})
 			}
 		}
