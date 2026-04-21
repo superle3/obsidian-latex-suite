@@ -4,7 +4,7 @@ import { findMatchingBracket, getCloseBracket } from "src/utils/editor_utils";
 import { Mode } from "../snippets/options";
 import { Environment } from "../snippets/environment";
 import { getLatexSuiteConfig } from "../snippets/codemirror/config";
-import { syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import { snippetLessArea, textAreaEnvs } from "./default_text_areas";
 
@@ -298,7 +298,7 @@ const getCodeblockBoundNodes = (
 	state: EditorState,
 	pos: number = state.selection.main.from
 ): { begin: SyntaxNode; end: SyntaxNode } | null => {
-	const tree = syntaxTree(state);
+	const tree = ensureSyntaxTree(state, pos, 1000);
 	const cursor = tree.cursor();
 	cursor.childBefore(pos);
 
@@ -611,5 +611,6 @@ export const getMathBoundsPlugin = (view: EditorView) => {
 	if (!plugin) {
 		throw new Error("MathBoundsPlugin not found, something went wrong with the plugin initialization");
 	}
-	return plugin.init(view);
+	const res = plugin.init(view);
+	return res
 }

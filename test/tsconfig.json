@@ -1,0 +1,13 @@
+{
+	"compilerOptions": {
+		"types": [
+			"@wdio/globals/types",
+			"@wdio/mocha-framework",
+			"wdio-obsidian-service"
+		],
+		"strict": true,
+		"noImplicitOverride": true,
+		"allowJs": true
+	},
+	"include": ["src/**/*.ts", "specs/**/*.ts"]
+}
