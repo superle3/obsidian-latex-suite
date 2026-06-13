@@ -1,5 +1,5 @@
 import { EditorView } from "@codemirror/view";
-import { Annotation, ChangeSet, EditorSelection } from "@codemirror/state";
+import { Annotation, ChangeSet, EditorSelection, EditorState, StateEffect, Transaction } from "@codemirror/state";
 import { endSnippet, startSnippet } from "./codemirror/history";
 import { isolateHistory } from "@codemirror/commands";
 import { TabstopSpec, tabstopSpecsToTabstopGroups } from "./tabstop";
@@ -106,6 +106,7 @@ function expandTabstops(
 	}, spec);
 }
 
+export const setNextTabstopEffect = StateEffect.define<null>();
 // Returns true if the transaction was dispatched
 export function setSelectionToNextTabstop(view: EditorView, shiftKey: boolean): boolean {
 	const tabstopGroups = view.state.field(tabstopsStateField).tabstopGroups;
@@ -126,10 +127,11 @@ export function setSelectionToNextTabstop(view: EditorView, shiftKey: boolean): 
 		if (currSel.eq(nextGrpSel)){
 			return aux(nextGrpIndex + direction, direction);
 		}
-
-		view.dispatch({
+		const transaction = view.state.update({
 			selection: nextGrpSel,
+			effects: setNextTabstopEffect.of(null)
 		});
+		view.dispatch(transaction);
 		resetCursorBlink(view);
 
 		return true;
@@ -137,3 +139,29 @@ export function setSelectionToNextTabstop(view: EditorView, shiftKey: boolean): 
 	const direction = shiftKey ? -1 : 1;
 	return aux(index + direction, direction);
 }
+
+let selectionEffectTime: "none" | "error"| number = "none";
+export const filter = EditorState.transactionFilter.of((tr) => {
+	if (selectionEffectTime === "error") {
+		selectionEffectTime = "none";
+		return tr;
+	}
+	
+	if (selectionEffectTime !== "none") {
+		const newTime = tr.annotation(Transaction.time);
+		if (newTime && newTime !== selectionEffectTime) {
+			console.debug("Resetting selection effect time", newTime - selectionEffectTime);
+			console.debug(tr);
+			console.trace();
+		}
+		selectionEffectTime = "none";
+		
+		return tr;
+	}
+	if (tr.effects.some(e => e.is(setNextTabstopEffect))) {
+		selectionEffectTime = tr.annotation(Transaction.time) ?? "error";
+		console.debug("Handling set next tabstop effect");
+		return tr;
+	}
+	return tr;
+});

@@ -17,6 +17,7 @@ import { cursorTooltipBaseTheme, cursorTooltipField } from "./editor_extensions/
 import { contextPlugin, getContextPlugin, mathBoundsPlugin } from "./utils/context";
 import { LatexSuitePluginPublicApi } from "./api";
 import * as v from "valibot"
+import { filter } from "./snippets/snippet_management";
 
 export default class LatexSuitePlugin extends Plugin implements LatexSuitePluginPublicApi {
 	settings: LatexSuitePluginSettings;
@@ -194,6 +195,7 @@ export default class LatexSuitePlugin extends Plugin implements LatexSuitePlugin
 			Prec.highest(EditorView.inputHandler.of(onInput)),
 			EditorView.updateListener.of(handleUpdate),
 			snippetExtensions,
+			filter
 		]);
 		
 		const latexSuiteKeymaps = getKeymaps(this.CMSettings)
