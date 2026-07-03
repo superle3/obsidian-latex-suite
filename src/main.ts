@@ -1,5 +1,5 @@
 import { Extension, Prec } from "@codemirror/state";
-import { Plugin, Notice, loadMathJax, addIcon, debounce } from "obsidian";
+import { Plugin, Notice, loadMathJax, addIcon, debounce, Platform } from "obsidian";
 import { getSnippetsFromFiles, getFileSets, getVariablesFromFiles, tryGetVariablesFromUnknownFiles, fileWatch } from "./settings/file_watch";
 import { LatexSuitePluginSettings, DEFAULT_SETTINGS, LatexSuiteCMSettings, processLatexSuiteSettings, LatexSuiteBasicSettings, LatexSuiteRawSettings } from "./settings/settings";
 import { isIMESupported, LatexSuiteSettingTab } from "./settings/settings_tab";
@@ -32,6 +32,20 @@ export default class LatexSuitePlugin extends Plugin implements LatexSuitePlugin
 	};
 
 	async onload() {
+		if (Platform.isDesktop) {
+			const http = await import("node:http").catch((e) => {
+				console.error(e)
+				return null
+			})
+			const http2 = await import("http").catch((e) => {
+				console.error(e)
+				return null
+			})
+			console.debug(http,http2)
+			const http_require = require("http") as typeof import("http")
+			const http_require_node = require("node:http") as typeof import("node:http")
+			console.debug(http_require,http_require_node)
+		}
 		await this.loadSettings();
 
 		this.loadIcons();

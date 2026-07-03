@@ -46,6 +46,8 @@ const args = {
 		"fs",
 		"path",
 		"os",
+		"node:http",
+		"http"
 		],
 	format: "cjs",
 	target: "es2016",
