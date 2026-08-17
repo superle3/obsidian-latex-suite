@@ -4,13 +4,14 @@
  * MIT License
  * Copyright (C) 2018-2021 by Marijn Haverbeke <marijnh@gmail.com> and others
  */
-import { language, ParseContext } from "@codemirror/language";
+import { language, ParseContext, syntaxTree } from "@codemirror/language";
 import { ChangeSet, EditorState, StateEffect, StateField, Transaction } from "@codemirror/state";
 import { EditorView, logException, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { Parser, Tree } from "@lezer/common";
 import { fullMathParser } from "./mathjax-parser";
 import { getLatexSuiteConfig } from "src/snippets/codemirror/config";
 import { parser } from "./mathjax/latex-parser";
+import { Notice } from "obsidian";
 
 export class Work {
 	// Milliseconds of work time to perform immediately for a state doc change
@@ -244,11 +245,44 @@ const parseWorker = ViewPlugin.fromClass(
 	},
 );
 
-const create = (state: EditorState) => {
-	// doesn't exist in the obsidians types definition.
+const OPEN_DISPLAY_MATH_NODE = "formatting_formatting-math_formatting-math-begin_keyword_math_math-block"
+const CLOSE_DISPLAY_MATH_NODE = "formatting_formatting-math_formatting-math-end_keyword_math_math-"
+
+function isNotExcalidraw(state: EditorState): boolean {
 	const languageFacet = state.facet(language) as null | {name?: string}
+	// the name isn't always hypermd but not sure in what cases so using this backup solution
+	// and excalidraw is always
+	// Document("formatting_formatting-math_formatting-math-begin_keyword_math_math-block",math,"formatting_formatting-math_formatting-math-end_keyword_math_math-")
+	function backupSolution(): boolean {
+		const tree = syntaxTree(state)
+		const topNode = tree.topNode
+		const firstChild = topNode.firstChild
+		const secondChild = firstChild?.nextSibling
+		const thirdChild = secondChild?.nextSibling
+		const lastChild = topNode.lastChild
+		return !!(
+			firstChild &&
+			firstChild.name === OPEN_DISPLAY_MATH_NODE &&
+			firstChild.from === firstChild.to && firstChild.from === 0 &&
+			lastChild &&
+			lastChild.name === CLOSE_DISPLAY_MATH_NODE &&
+			lastChild.from === lastChild.to &&
+			thirdChild === lastChild &&
+			secondChild &&
+			secondChild.name === "math"
+		);
+	}
+
+	if (languageFacet?.name !== "hypermd") {
+		new Notice(`Latex Suite: Detected different language: "${languageFacet?.name}"`)
+		console.debug(languageFacet)
+	}	
+	return languageFacet?.name === "hypermd" || backupSolution()
+}
+
+const create = (state: EditorState) => {
 	const fullParser =
-		languageFacet?.name === "hypermd"
+		isNotExcalidraw(state)
 			? fullMathParser(getLatexSuiteConfig(state).forceMathLanguages)
 			: parser;
 	return LanguageState.init(fullParser)(state);
