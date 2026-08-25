@@ -3,11 +3,14 @@ import { SyntaxNode } from "@lezer/common";
 import { modifiedSyntaxTree } from "./language";
 import { Type } from "./mathjax-parser";
 import { EditorState } from "@codemirror/state";
+import { getLatexSuiteConfig } from "src/snippets/codemirror/config";
 
 export const mathParserPlugin = ViewPlugin.fromClass(
 	class {
 		update(update: ViewUpdate) {
 			if (!update.docChanged) return;
+			const settings = getLatexSuiteConfig(update.state);
+			if (settings.suppressIMEWarning) return;
 			try {
 				// this.printMountedTrees(update.state)
 				const tree = modifiedSyntaxTree(update.state);
