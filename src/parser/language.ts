@@ -269,9 +269,12 @@ function isNotExcalidraw(state: EditorState): boolean {
 			secondChild,
 			secondChild?.name === "math"
 		].map(cond => !!cond)
-		new Notice("Language: " + languageFacet?.name + "is not excalidraw" + JSON.stringify(conditions), 5000)
-		console.debug("isNotExcalidraw conditions", conditions, "result", conditions.every(cond => cond), conditions)
-		return conditions.every(cond => cond)
+		const settings = getLatexSuiteConfig(state)
+		if (!settings.suppressIMEWarning) {
+			new Notice("Language: " + languageFacet?.name + "is not excalidraw" + JSON.stringify(conditions), 5000)
+			console.debug("isNotExcalidraw conditions", conditions, "result", conditions.every(cond => !cond), conditions)
+		}
+		return conditions.every(cond => !cond)
 	}
 	return languageFacet?.name === "hypermd" || languageFacet?.name === "templater" || checkSyntaxTree()
 }
