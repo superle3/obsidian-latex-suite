@@ -11,6 +11,7 @@ import { Parser, Tree } from "@lezer/common";
 import { fullMathParser } from "./mathjax-parser";
 import { getLatexSuiteConfig } from "src/snippets/codemirror/config";
 import { parser } from "./mathjax/latex-parser";
+import { Notice } from "obsidian";
 
 export class Work {
 	// Milliseconds of work time to perform immediately for a state doc change
@@ -257,16 +258,20 @@ function isNotExcalidraw(state: EditorState): boolean {
 		const firstChild = topNode.firstChild
 		const secondChild = firstChild?.nextSibling
 		const lastChild = topNode.lastChild
-		return !(
-			firstChild &&
-			firstChild.name === OPEN_DISPLAY_MATH_NODE &&
-			firstChild.from === firstChild.to && firstChild.from === 0 &&
-			lastChild &&
-			lastChild.name === CLOSE_DISPLAY_MATH_NODE &&
-			lastChild.from === lastChild.to &&
-			secondChild &&
-			secondChild.name === "math"
-		);
+		const conditions = [
+			firstChild,
+			firstChild?.name === OPEN_DISPLAY_MATH_NODE,
+			firstChild?.from === firstChild?.to,
+			firstChild?.from === 0,
+			lastChild,
+			lastChild?.name === CLOSE_DISPLAY_MATH_NODE,
+			lastChild?.from === lastChild?.to,
+			secondChild,
+			secondChild?.name === "math"
+		].map(cond => !!cond)
+		new Notice("Language: " + languageFacet?.name + "is not excalidraw" + JSON.stringify(conditions), 5000)
+		console.debug("isNotExcalidraw conditions", conditions, "result", conditions.every(cond => cond), conditions)
+		return conditions.every(cond => cond)
 	}
 	return languageFacet?.name === "hypermd" || languageFacet?.name === "templater" || checkSyntaxTree()
 }
