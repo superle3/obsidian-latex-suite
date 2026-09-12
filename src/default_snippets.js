@@ -44,19 +44,19 @@ export default [
 
     // Text environment
 	{trigger: /\n\s*\"/, replacement: "\n\\text{$0 } $1", options: "mrA"}, // Text at the beginning of a line
-    {trigger: "text", replacement: "\\text{$0}$1", options: "mA", priority: -1},
-    {trigger: "\"", replacement: "\\text{$0}$1", options: "mA", priority: -1},
+    {trigger: "text", replacement: "\\text{$0}", options: "mA", priority: -1},
+    {trigger: "\"", replacement: "\\text{$0}", options: "mA", priority: -1},
 
     // Basic operations
     {trigger: "sr", replacement: "^{2}", options: "mA"},
 	{trigger: "cb", replacement: "^{3}", options: "mA"},
-	{trigger: "rd", replacement: "^{$0}$1", options: "mA", description: "Raise to (D)the power of"}, // the `th` in the phrase is spoken like a d so rd for short.
-	{trigger: "_", replacement: "_{$0}$1", options: "mA"},
+	{trigger: "rd", replacement: "^{$0}", options: "mA", description: "Raise to (D)the power of"}, // the `th` in the phrase is spoken like a d so rd for short.
+	{trigger: "_", replacement: "_{$0}", options: "mA"},
 	{trigger: "sts", replacement: "_\\text{$0}", options: "mA"},
-	{trigger: "sq", replacement: "\\sqrt{ $0 }$1", options: "mA"},
-	{trigger: /(\d)rt/, replacement: "\\sqrt[[[0]]]{ $0 }$1", options: "mA", description: "Nth RooT"},
-	{trigger: "//", replacement: "\\frac{$0}{$1}$2", options: "mA"},
-	{trigger: /\bee/, replacement: "e^{ $0 }$1", options: "mA"},
+	{trigger: "sq", replacement: "\\sqrt{ $0 }", options: "mA"},
+	{trigger: /(\d)rt/, replacement: "\\sqrt[[[0]]]{ $0 }", options: "mA", description: "Nth RooT"},
+	{trigger: "//", replacement: "\\frac{$0}{$1}", options: "mA"},
+	{trigger: /\bee/, replacement: "e^{ $0 }", options: "mA"},
     {trigger: "invs", replacement: "^{-1}", options: "mA"},
 
     {trigger: /([^\\])(exp|log|ln)/, replacement: "[[0]]\\[[1]]", options: "rmA"},
@@ -64,7 +64,7 @@ export default [
     {trigger: "Re", replacement: "\\mathrm{Re}", options: "mA"},
 	{trigger: "Im", replacement: "\\mathrm{Im}", options: "mA"},
     {trigger: "bf", replacement: "\\mathbf{$0}", options: "mA"},
-	{trigger: "rm", replacement: "\\mathrm{$0}$1", options: "mA"},
+	{trigger: "rm", replacement: "\\mathrm{$0}", options: "mA"},
 
     // Linear algebra
     {trigger: /([^\\])(det)/, replacement: "[[0]]\\[[1]]", options: "rmA"},
@@ -85,18 +85,18 @@ export default [
 	{trigger: "\\\\(${GREEK}),\\.", replacement: "\\boldsymbol{\\[[0]]}", options: "rmA"},
 	{trigger: "\\\\(${GREEK})\\.,", replacement: "\\boldsymbol{\\[[0]]}", options: "rmA"},
 
-	{trigger: "hat", replacement: "\\hat{$0}$1", options: "mA"},
-    {trigger: "bar", replacement: "\\bar{$0}$1", options: "mA"},
-	{trigger: "dot", replacement: "\\dot{$0}$1", options: "mA", priority: -1},
-	{trigger: "ddot", replacement: "\\ddot{$0}$1", options: "mA"},
+	{trigger: "hat", replacement: "\\hat{$0}", options: "mA"},
+    {trigger: "bar", replacement: "\\bar{$0}", options: "mA"},
+	{trigger: "dot", replacement: "\\dot{$0}", options: "mA", priority: -1},
+	{trigger: "ddot", replacement: "\\ddot{$0}", options: "mA"},
 	{trigger: "cdot", replacement: "\\cdot", options: "mA"},
-	{trigger: "tilde", replacement: "\\tilde{$0}$1", options: "mA"},
-	{trigger: "und", replacement: "\\underline{$0}$1", options: "mA"},
-	{trigger: "vec", replacement: "\\vec{$0}$1", options: "mA"},
-	// {trigger: "vec", replacement: "\\overrightarrow{$0}$1", options: "mA"},
+	{trigger: "tilde", replacement: "\\tilde{$0}", options: "mA"},
+	{trigger: "und", replacement: "\\underline{$0}", options: "mA"},
+	{trigger: "vec", replacement: "\\vec{$0}", options: "mA"},
+	// {trigger: "vec", replacement: "\\overrightarrow{$0}", options: "mA"},
     {
         trigger: "pmod",
-        replacement: "\\pmod{${0:n}}$1",
+        replacement: "\\pmod{${0:n}}",
         options: "mA",
         description: "Parenthesized modulo (\\pmod{n})",
     },
@@ -193,7 +193,7 @@ export default [
     {trigger: "prop", replacement: "\\propto", options: "mA"},
 
 
-    {trigger: "<->", replacement: "\\leftrightarrow ", options: "mA"},
+    {trigger: "<->", replacement: "\\leftrightarrow", options: "mA"},
 	{trigger: "->", replacement: "\\to", options: "mA", excludedMacros: ["ce"]},
 	{trigger: "!>", replacement: "\\mapsto", options: "mA"},
     {trigger: "=>", replacement: "\\implies", options: "mA"},
@@ -207,7 +207,7 @@ export default [
     {trigger: "sub=", replacement: "\\subseteq", options: "mA"},
     {trigger: "sup=", replacement: "\\supseteq", options: "mA"},
 	{trigger: "eset", replacement: "\\emptyset", options: "mA"},
-	{trigger: "set", replacement: "\\{ $0 \\}$1", options: "wmA"},
+	{trigger: "set", replacement: "\\{ $0 \\}", options: "wmA"},
 	{trigger: /(n?)e\\xi sts/, replacement: "\\[[0]]exists", options: "mA", priority: 1},
 
 	{trigger: "LL", replacement: "\\mathcal{L}", options: "mA"},
@@ -230,7 +230,7 @@ export default [
 
 	{trigger: "\\\\(${GREEK}|${SYMBOL}) sr", replacement: "\\[[0]]^{2}", options: "rmA"},
 	{trigger: "\\\\(${GREEK}|${SYMBOL}) cb", replacement: "\\[[0]]^{3}", options: "rmA"},
-	{trigger: "\\\\(${GREEK}|${SYMBOL}) rd", replacement: "\\[[0]]^{$0}$1", options: "rmA"},
+	{trigger: "\\\\(${GREEK}|${SYMBOL}) rd", replacement: "\\[[0]]^{$0}", options: "rmA"},
 	{trigger: "\\\\(${GREEK}) hat", replacement: "\\hat{\\[[0]]}", options: "rmA"},
 	{trigger: "\\\\(${GREEK}) dot", replacement: "\\dot{\\[[0]]}", options: "rmA"},
 	{trigger: "\\\\(${GREEK}) bar", replacement: "\\bar{\\[[0]]}", options: "rmA"},
@@ -324,19 +324,17 @@ export default [
     },
 
     // Brackets
-	{trigger: "avg", replacement: "\\langle $0 \\rangle $1", options: "mA"},
-	{trigger: "norm", replacement: "\\lvert $0 \\rvert $1", options: "mA", priority: 1},
-	{trigger: "Norm", replacement: "\\lVert $0 \\rVert $1", options: "mA", priority: 1},
-	{trigger: "ceil", replacement: "\\lceil $0 \\rceil $1", options: "mA"},
-	{trigger: "floor", replacement: "\\lfloor $0 \\rfloor $1", options: "mA"},
-    // For the modulo operator, see the section "More operations" above
-	{trigger: "mod", replacement: "|$0|$1", options: "mA"},
+	{trigger: "avg", replacement: "\\langle $0 \\rangle", options: "mA"},
+	{trigger: "norm", replacement: "\\lvert $0 \\rvert", options: "mA", priority: 1},
+	{trigger: "Norm", replacement: "\\lVert $0 \\rVert", options: "mA", priority: 1},
+	{trigger: "ceil", replacement: "\\lceil $0 \\rceil", options: "mA"},
+	{trigger: "floor", replacement: "\\lfloor $0 \\rfloor", options: "mA"},
 	{trigger: "(", replacement: "(${VISUAL})", options: "mv"},
 	{trigger: "[", replacement: "[${VISUAL}]", options: "mv"},
 	{trigger: "{", replacement: "{${VISUAL}}", options: "mv"},
-	{trigger: "(", replacement: "($0)$1", options: "mA"},
-	{trigger: "{", replacement: "{$0}$1", options: "mA"},
-	{trigger: "[", replacement: "[$0]$1", options: "mA"},
+	{trigger: "(", replacement: "($0)", options: "mA"},
+	{trigger: "{", replacement: "{$0}", options: "mA"},
+	{trigger: "[", replacement: "[$0]", options: "mA"},
 	{trigger: "lr(", replacement: "\\left( $0 \\right) $1", options: "mA"},
 	{trigger: "lr{", replacement: "\\left\\{ $0 \\right\\} $1", options: "mA"},
 	{trigger: "lr[", replacement: "\\left[ $0 \\right] $1", options: "mA"},
