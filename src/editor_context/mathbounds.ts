@@ -1,30 +1,54 @@
 import { EditorView, type PluginValue, ViewPlugin, ViewUpdate } from "@codemirror/view";
-import { type Bounds, type CMBound, MathMode } from "./context";
+import { type Bounds as Bound, type CMBound, MathMode } from "./context";
 import { EditorState } from "@codemirror/state";
 import type { SyntaxNode, SyntaxNodeRef } from "@lezer/common";
 import { modifiedSyntaxTree } from "src/parser/language";
 import { Type } from "src/parser/mathjax-parser";
 import { getLatexSuiteConfig } from "src/snippets/codemirror/config";
 import { latex } from "src/parser/latex-terms";
+import { BlockMathMode, CodeBlockMode, CodeMathMode, InlineCodeMode, InlineBlockMathMode, InlineMathMode, type MathModes } from "./options";
 
 
 type EquationInfo = { text: string; bound: MathBoundWithTree; overlay: CMBound; };
 
-type MathBoundWithTree = MathBounds & { tree: SyntaxNode; };
+type MathBoundWithTree = MathBound & { tree: SyntaxNode; };
 
-type MathBounds = Bounds & {
-	mode: MathMode;
+export const enum BoundKind {
+	MathBound,
+	InlineCodeBound,
+	CodeBlockBound
+}
+
+export type MathBound = Bound & {
+	Mmode: MathMode;
 	tree: SyntaxNode | null;
 	overlay: CMBound[];
+	mode: MathModes
+	kind: BoundKind.MathBound
 };
 
+type CodeBlockBounds = Bound & {
+	language: string;
+	tree: SyntaxNode | null;
+	overlay: CMBound[];
+	mode: CodeBlockMode
+	kind: BoundKind.CodeBlockBound
+};
+
+type InlineCodeBounds = Bound & {
+	mode: InlineCodeMode
+	kind: BoundKind.InlineCodeBound
+}
+
+type Bounds = MathBound | CodeBlockBounds | InlineCodeBounds;
+
 export class MathBoundsPlugin implements PluginValue {
-	private _mathBounds: MathBounds[] = [];
+	private _bounds: Bounds[] = [];
 	private equationsOverlays: EquationInfo[] | null = null;
 	shouldUpdate: boolean = false;
 
-	get mathBounds() {
-		return this._mathBounds
+	get mathBounds(): readonly MathBound[] {
+		return this._bounds.filter((bound): bound is MathBound => bound.mode.inMath);
 	}
 
 	constructor(view: EditorView) {
@@ -32,7 +56,7 @@ export class MathBoundsPlugin implements PluginValue {
 	}
 
 	reset() {
-		this._mathBounds = [];
+		this._bounds = [];
 		this.equationsOverlays = null;
 		this.shouldUpdate = false;
 	}
@@ -68,104 +92,151 @@ export class MathBoundsPlugin implements PluginValue {
 		}
 	}
 
-	updateMathBounds(view: EditorView) {
-		const tree = modifiedSyntaxTree(view.state);
-		const ranges: MathBounds[] = [];
-		const settings = getLatexSuiteConfig(view.state);
-		for (const { from, to } of view.visibleRanges) {
-			tree.iterate({
-				from,
-				to,
-				enter: (nodeRef: SyntaxNodeRef) => {
-					if (nodeRef.name === Type.DollarDisplayBlockMath) {
-						const { open, close } = this.getDollarBounds(nodeRef.node);
-						const children = nodeRef.node.getChildren("DisplayMath")
-						if (children.length === 0) {
-							ranges.push({
-								inner_start: open.to,
-								inner_end: close.from,
-								outer_start: open.from,
-								outer_end: close.to,
-								mode: MathMode.BlockMath,
-								tree: null,
-								overlay: [],
-							})
-							return;
-						}
+	_iterateNodesEnter(nodeRef: SyntaxNodeRef, forceMathLanguages: string[], view: EditorView): boolean | void {
+		if (nodeRef.name === Type.DollarDisplayBlockMath) {
+			const { open, close } = this.getDollarBounds(nodeRef.node);
+			const children = nodeRef.node.getChildren("DisplayMath")
+			if (children.length === 0) {
+				this._bounds.push({
+					inner_start: open.to,
+					inner_end: close.from,
+					outer_start: open.from,
+					outer_end: close.to,
+					Mmode: MathMode.BlockDisplayMath,
+					tree: null,
+					overlay: [],
+					kind: BoundKind.MathBound,
+					mode: new BlockMathMode()
+				})
+				return false;
+			}
 
-						const tree = nodeRef.node.enter(children[children.length - 1].to, -1);
-						if (!tree) {
-							return;
-						}
+			const tree = nodeRef.node.enter(children[children.length - 1].to, -1);
+			if (!tree) {
+				return false;
+			}
 
-						ranges.push({
-							inner_start: open.to,
-							inner_end: close.from,
-							outer_start: open.from,
-							outer_end: close.to,
-							mode: MathMode.BlockMath,
-							tree,
-							overlay: children,
-						});
-					} else if (
-						nodeRef.name === Type.DollarInlineMath ||
-						nodeRef.name === Type.DollarDisplayMath
-					) {
-						const { open, close } = this.getDollarBounds(nodeRef.node);
-						const tree = nodeRef.node.getChild("LaTeX");
-						if (!tree) {
-							return
-						}
-						const mode = nodeRef.name === Type.DollarInlineMath ? MathMode.InlineMath : MathMode.BlockMath;
-						ranges.push({
-							inner_start: open.to,
-							inner_end: close.from,
-							outer_start: open.from,
-							outer_end: close.to,
-							mode,
-							tree,
-							overlay: [tree],
-						});
-					} else if (nodeRef.name === "FencedCode") {
-						const infoNode = nodeRef.node.getChild("CodeInfo");
-						if (!infoNode) return;
-						const language = view.state.sliceDoc(infoNode.from, infoNode.to)
-						if (!settings.forceMathLanguages.includes(language)) return;
-						const contentNodes = nodeRef.node.getChildren("CodeText");
-						const lastNode = contentNodes.last();
-						if (!lastNode) return;
-						const tree = nodeRef.node.enter(lastNode.to, -1);
-						if (tree === null || !tree.type.is(latex.LaTeX)) return;
-						ranges.push({
-							inner_start: contentNodes[0].from,
-							inner_end: lastNode.to,
-							outer_start: nodeRef.node.from,
-							outer_end: nodeRef.node.to,
-							mode: MathMode.CodeMath,
-							tree,
-							overlay: contentNodes,
-						});
-					// for excalidraw the topnode is LaTeX but it's also a topnode in the mounted tree
-					// thus check if it has a parent instead.
-					} else if (nodeRef.type.is(latex.LaTeX) && nodeRef.node.parent === null) {
-						ranges.push({
-							inner_start: nodeRef.node.from,
-							inner_end: nodeRef.node.to,
-							outer_start: nodeRef.node.from,
-							outer_end: nodeRef.node.to,
-							mode: MathMode.BlockMath,
-							tree: nodeRef.node,
-							overlay: [{ from: nodeRef.from, to: nodeRef.to }],
-						});
-					}
-				},
+			this._bounds.push({
+				inner_start: open.to,
+				inner_end: close.from,
+				outer_start: open.from,
+				outer_end: close.to,
+				Mmode: MathMode.BlockDisplayMath,
+				tree,
+				overlay: children,
+				kind: BoundKind.MathBound,
+				mode: new BlockMathMode()
 			});
+			return false;
+		} else if (
+			nodeRef.name === Type.DollarInlineMath ||
+			nodeRef.name === Type.DollarDisplayMath
+		) {
+			const { open, close } = this.getDollarBounds(nodeRef.node);
+			const tree = nodeRef.node.getChild("LaTeX");
+			if (!tree) {
+				return false;
+			}
+			const mode = nodeRef.name === Type.DollarInlineMath ? new InlineMathMode() : new InlineBlockMathMode();
+			const Mmode = nodeRef.name === Type.DollarInlineMath ? MathMode.InlineMath : MathMode.InlineDisplayMath;
+			this._bounds.push({
+				inner_start: open.to,
+				inner_end: close.from,
+				outer_start: open.from,
+				outer_end: close.to,
+				Mmode,
+				tree,
+				overlay: [tree],
+				kind: BoundKind.MathBound,
+				mode,
+			});
+			return false;
+		} else if (nodeRef.name === "FencedCode" || nodeRef.name === "CodeBlock") {
+			const language = getCodeLanguage(nodeRef.node, view);
+			if (!language || !forceMathLanguages.includes(language)) {
+				const bound = createCodeBlockBounds(nodeRef.node, language ?? "");
+				if (bound) {
+					this._bounds.push(bound);
+				}
+				return false;
+			}
+			const contentNodes = nodeRef.node.getChildren("CodeText");
+			const lastNode = contentNodes.last();
+			if (!lastNode) return;
+			const tree = nodeRef.node.enter(lastNode.to, -1);
+			if (tree === null || !tree.type.is(latex.LaTeX)) return;
+			this._bounds.push({
+				inner_start: contentNodes[0].from,
+				inner_end: lastNode.to,
+				outer_start: nodeRef.node.from,
+				outer_end: nodeRef.node.to,
+				Mmode: MathMode.CodeMath,
+				tree,
+				overlay: contentNodes,
+				kind: BoundKind.MathBound,
+				mode: new CodeMathMode()
+			});
+			return false;
+		} else if (nodeRef.name === "InlineCode") {
+			const children = nodeRef.node.getChildren("CodeMark");
+			if (children.length < 2) return;
+			const start = children[0];
+			const end = children[children.length - 1];
+			this._bounds.push({
+				inner_start: start.to,
+				inner_end: end.from,
+				outer_start: start.from,
+				outer_end: end.to,
+				kind: BoundKind.InlineCodeBound,
+				mode: new InlineCodeMode()
+			});
+			return false;
 		}
-		this._mathBounds = ranges;
 	}
 
-	inMathBound(_state: EditorState, pos: number): MathBounds | null {
-		const bounds = this._mathBounds;
+	updateMathBounds(view: EditorView) {
+		const tree = modifiedSyntaxTree(view.state);
+		this._bounds = [];
+		const forceMathLanguages = getLatexSuiteConfig(view).forceMathLanguages;
+		const topNode = tree.topNode;
+		if (topNode.type.is(latex.LaTeX)) {
+			this._bounds.push({
+				inner_start: topNode.from,
+				inner_end: topNode.to,
+				outer_start: topNode.from,
+				outer_end: topNode.to,
+				Mmode: MathMode.BlockDisplayMath,
+				tree: topNode.node,
+				overlay: [{ from: topNode.from, to: topNode.to }],
+				mode: new BlockMathMode(),
+				kind: BoundKind.MathBound
+			});
+		} else {
+			for (const { from, to } of view.visibleRanges) {
+				tree.iterate({
+					from,
+					to,
+					enter: (nodeRef) =>
+						this._iterateNodesEnter(
+							nodeRef,
+							forceMathLanguages,
+							view,
+						),
+				});
+			}
+		}
+	}
+	
+	inMathBound(_state: EditorState, pos: number): MathBound | null {
+		const bound = this.inBound(_state, pos);
+		if (bound && bound.kind === BoundKind.MathBound) {
+			return bound;
+		}
+		return null;
+	}
+
+	inBound(_state: EditorState, pos: number): Bounds | null {
+		const bounds = this._bounds;
 		if (
 			pos < bounds[0]?.outer_start ||
 			pos > bounds[bounds.length - 1]?.outer_end
@@ -185,7 +256,8 @@ export class MathBoundsPlugin implements PluginValue {
 				left = mid + 1;
 			} else if (
 				pos < bound.inner_start &&
-				bound.mode == MathMode.BlockMath &&
+				bound.kind === BoundKind.MathBound &&
+				bound.mode.kind === "inlineBlockMath" &&
 				bound.inner_start - bound.outer_start == 2
 			) {
 				return {
@@ -193,9 +265,11 @@ export class MathBoundsPlugin implements PluginValue {
 					inner_start: bound.outer_start + 1,
 					inner_end: bound.outer_start + 1,
 					outer_end: bound.outer_start + 2,
-					mode: MathMode.InlineMath,
+					Mmode: MathMode.InlineMath,
 					tree: null,
 					overlay: [],
+					mode: new InlineMathMode(),
+					kind: BoundKind.MathBound,
 				};
 			} else if (pos < bound.inner_start || pos > bound.inner_end) {
 				break;
@@ -211,7 +285,7 @@ export class MathBoundsPlugin implements PluginValue {
 	getEquationOverlays(state: EditorState) {
 		if (this.equationsOverlays)
 			return this.equationsOverlays;
-		this.equationsOverlays = this._mathBounds.map((bound) =>
+		this.equationsOverlays = this.mathBounds.map((bound) =>
 			bound.overlay.length === 0 || bound.tree === null ? null :
 			{
 				bound,
@@ -220,6 +294,39 @@ export class MathBoundsPlugin implements PluginValue {
 			}		
 		).filter((x): x is EquationInfo => x !== null);
 		return this.equationsOverlays;
+	}
+}
+
+function getCodeLanguage(node: SyntaxNode, view: EditorView): string | null {
+	const infoNode = node.getChild("CodeInfo");
+	if (!infoNode) return null;
+	const language = view.state.sliceDoc(infoNode.from, infoNode.to);
+	return language;
+}
+
+/**
+ * Creates a CodeBlockBounds object for a given node and language.
+ * 
+ * @param node A FencedCode node or CodeBlock node
+ * @param language the language of the codeblock, should be empty if it doesn't exist.
+ * @returns the bound if the node is not empty, otherwise null.
+ */
+function createCodeBlockBounds(node: SyntaxNode, language: string): CodeBlockBounds | null {
+	const contentNodes = node.getChildren("CodeText");
+	if (contentNodes.length === 0) return null;
+	const firstNode = contentNodes[0];
+	const lastNode = contentNodes.last()!;
+	const tree = lastNode.enter(lastNode.to, -1);
+	return {
+		outer_start: node.from,
+		inner_start: firstNode.from,
+		inner_end: lastNode?.to,
+		outer_end: node.to,
+		language,
+		overlay: contentNodes,
+		tree,
+		mode: new CodeBlockMode(language),
+		kind: BoundKind.CodeBlockBound,
 	}
 }
 

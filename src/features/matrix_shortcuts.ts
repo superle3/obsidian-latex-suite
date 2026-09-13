@@ -61,8 +61,8 @@ const addCellMatrixShortcutCallback = (view: EditorView): boolean => {
 
 const matrixShortcutsRunner = (shortcut: (view: EditorView, bounds: Bounds) => boolean) => (view: EditorView): boolean => {
 	const ctx = getContextPlugin(view);
-	if (!ctx.mode.strictlyInMath()) return false;
-	const bounds = ctx.getBounds();
+	if (!ctx.mode.strictlyInMath) return false;
+	const bounds = ctx.getMathBounds();
 	if (!bounds) return false;
 	const envName = ctx.getEnvNames(ctx.pos).next().value;
 	if (!envName) return false;

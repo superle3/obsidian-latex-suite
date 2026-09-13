@@ -12,7 +12,7 @@ import { Transaction, Annotation, type TransactionSpec } from "@codemirror/state
 
 function boxCurrentEquation(view: EditorView) {
 	const ctx = getContextPlugin(view);
-	const result = ctx.getBounds();
+	const result = ctx.getMathBounds();
 	if (!result) return false;
 	const {inner_start: start, inner_end: end} = result;
 
@@ -39,7 +39,7 @@ function getBoxEquationCommand() {
 
 			const view = editor.cm;
 			const ctx = getContextPlugin(view);
-			const withinEquation = ctx.mode.inMath();
+			const withinEquation = ctx.mode.inMath;
 
 			if (checking) return withinEquation;
 			if (!withinEquation) return;
@@ -61,13 +61,13 @@ function getSelectEquationCommand() {
 
 			const view = editor.cm;
 			const ctx = getContextPlugin(view);
-			const withinEquation = ctx.mode.inMath();
+			const withinEquation = ctx.mode.inMath;
 
 			if (checking) return withinEquation;
 			if (!withinEquation) return;
 
 
-			const result = ctx.getBounds();
+			const result = ctx.getMathBounds();
 			if (!result) return false;
 			let {inner_start: start, inner_end: end} = result;
 

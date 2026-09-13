@@ -7,13 +7,14 @@ import {
 	ViewPlugin,
 	ViewUpdate,
 } from "@codemirror/view";
-import { type Bounds, MathMode } from "src/editor_context/context";
+import { type Bounds } from "src/editor_context/context";
 import { getMathBoundsPlugin } from "src/editor_context/mathbounds";
+import { InlineMathMode, type MathModes } from "src/editor_context/options";
 import { latex } from "src/parser/latex-terms";
 import { EquationText, iterateTreeCursor } from "src/utils/tokenizer";
 
 type DollarBounds =
-	| (Bounds & { kind: "pair", mode: MathMode })
+	| (Bounds & { kind: "pair", mode: MathModes })
 	| { from: number; to: number; kind: "error" };
 
 const ERROR_CLASS = "latex-suite-error-dollar";
@@ -73,7 +74,7 @@ class HighlightDollarPlugin implements PluginValue {
 							inner_end: dollars[1].from,
 							outer_end: dollars[1].to,
 							kind: "pair",
-							mode: MathMode.InlineMath,
+							mode: new InlineMathMode(),
 						});
 					}
 					const last = dollars.last();
@@ -108,9 +109,9 @@ class HighlightDollarPlugin implements PluginValue {
 				);
 			} else {
 				let modeClass: typeof INLINE_CLASS | typeof BLOCK_CLASS | typeof CODE_CLASS;
-				if (bounds.mode === MathMode.InlineMath || (bounds.mode === MathMode.BlockMath && bounds.outer_start - bounds.outer_end < 4)) {
+				if (bounds.mode.kind === "inlineMath" || (bounds.mode.kind === "inlineBlockMath" && bounds.outer_start - bounds.outer_end < 4)) {
 					modeClass = INLINE_CLASS;
-				} else if (bounds.mode === MathMode.BlockMath) {
+				} else if (bounds.mode.kind === "blockMath" || bounds.mode.kind === "inlineBlockMath") {
 					modeClass = BLOCK_CLASS;
 				} else {
 					modeClass = CODE_CLASS;

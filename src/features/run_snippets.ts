@@ -155,7 +155,7 @@ const runSnippetCursor = (view: EditorView, ctx: Context, snippetInfo: SnippetIn
 		let replacement = result.replacement;
 
 		// When in inline math, remove any spaces at the end of the replacement
-		if (ctx.mode.inlineMath && settings.removeSnippetWhitespace) {
+		if (ctx.mode.kind === "inlineMath" && settings.removeSnippetWhitespace) {
 			replacement = trimWhitespace(replacement, ctx);
 		}
 

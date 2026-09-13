@@ -67,38 +67,18 @@ export class Options {
 	}
 
 	snippetShouldRunInMode(
-		mode: Mode,
+		mode: CursorModes,
 		ignoreSnippetLessEnv: boolean = false,
 	): boolean {
-		if (mode.snippetlessEnv && !ignoreSnippetLessEnv) {
-			return false;
-		}
-		if (
-			(this.mode.inlineMath && mode.inlineMath) ||
-			(this.mode.blockMath && mode.blockMath) ||
-			((this.mode.inlineMath || this.mode.blockMath) && mode.codeMath)
-		) {
-			// only run when snippet doesn't run in `\text{}` and cursor not inside `\text{}` or they both are
-			if (mode.textEnv === this.mode.textEnv) {
-				return true;
-			}
-		}
-
-		if (this.mode.text && mode.text) {
-			return true;
-		}
-		if (
-			(this.mode.codeBlock === mode.codeBlock &&
-				mode.codeBlock !== false) ||
-			(this.mode.codeBlock === true && mode.codeBlock !== false)
-		) {
-			return true;
-		}
-
-		if (this.mode.code && mode.code) {
-			return true;
-		}
-		return false;
+		return (
+			(mode.kind === "snippetlessEnv" && !ignoreSnippetLessEnv) ||
+			(mode.kind === "textEnv" && this.mode.textEnv && ((mode.MultiLineMath && this.mode.blockMath) || (mode.OneLineMath && this.mode.inlineMath))) ||
+			(mode.kind === "text" && this.mode.text) ||
+			(mode.OneLineMath && this.mode.inlineMath) ||
+			(mode.MultiLineMath && this.mode.blockMath) ||
+			(mode.kind === "codeBlock" && (this.mode.codeBlock === true || this.mode.codeBlock === mode.language)) ||
+			(mode.kind === "code" && this.mode.code)
+		)
 	}
 
 	copy() {
@@ -109,6 +89,119 @@ export class Options {
 	}
 }
 
+type ModeKinds = "text" | "inlineMath" | "blockMath" | "inlineBlockMath" | "codeMath" | "code" | "codeBlock" | "textEnv" | "snippetlessEnv" | "off";
+export type CursorModes = TextMode | InlineMathMode | BlockMathMode | InlineBlockMathMode | CodeMathMode | InlineCodeMode | CodeBlockMode | TextEnvMode | SnippetlessEnvMode | OffMode;
+
+/**
+ * discriminated unions of all the different modes with common methods
+ * Its a bit too verbose for my taste, but the alternative with a bunch of flags loses type safety.
+ */
+
+interface BaseMode {
+	kind: ModeKinds;
+	inMath: boolean;
+	strictlyInMath: boolean;
+	OneLineMath: boolean;
+	MultiLineMath: boolean;
+}
+
+export class TextMode implements BaseMode {
+	readonly kind = "text";
+	readonly inMath = false;
+	readonly strictlyInMath = false;
+	readonly OneLineMath = false;
+	readonly MultiLineMath = false;
+}
+
+export class InlineMathMode implements BaseMode {
+	readonly kind = "inlineMath";
+	readonly inMath = true;
+	readonly strictlyInMath = true;
+	readonly OneLineMath = true;
+	readonly MultiLineMath = false;
+}
+
+export class BlockMathMode implements BaseMode {
+	readonly kind = "blockMath";
+	readonly inMath = true;
+	readonly strictlyInMath = true;
+	readonly MultiLineMath = true;
+	readonly OneLineMath = false;
+}
+
+export class InlineBlockMathMode implements BaseMode {
+	readonly kind = "inlineBlockMath";
+	readonly inMath = true;
+	readonly strictlyInMath = true;
+	readonly OneLineMath = true;
+	readonly MultiLineMath = true;
+}
+
+export class CodeMathMode implements BaseMode {
+	readonly kind = "codeMath";
+	readonly inMath = true;
+	readonly strictlyInMath = true;
+	readonly MultiLineMath = true;
+	readonly OneLineMath = false;
+}
+
+export class CodeBlockMode implements BaseMode {
+	readonly kind = "codeBlock";
+	readonly inMath = false;
+	readonly strictlyInMath = false;
+	readonly MultiLineMath = true;
+	readonly OneLineMath = false;
+	constructor(public readonly language: string) {}
+}
+
+export class InlineCodeMode implements BaseMode {
+	readonly kind = "code";
+	readonly inMath = false;
+	readonly strictlyInMath = false;
+	readonly MultiLineMath = false;
+	readonly OneLineMath = false;
+}
+
+export type MathModes = InlineMathMode | BlockMathMode | InlineBlockMathMode | CodeMathMode;
+
+export class TextEnvMode implements BaseMode {
+	readonly kind = "textEnv";
+	readonly mathKind: MathModes;
+	readonly inMath = true;
+	readonly strictlyInMath = false;
+	readonly OneLineMath: boolean;
+	readonly MultiLineMath: boolean;
+
+	constructor(mathKind: MathModes) {
+		this.mathKind = mathKind;
+		this.OneLineMath = mathKind.kind === "inlineMath" || mathKind.kind === "inlineBlockMath";
+		this.MultiLineMath = mathKind.kind === "blockMath" || mathKind.kind === "codeMath";
+	}
+}
+
+
+export class SnippetlessEnvMode implements BaseMode {
+	readonly kind = "snippetlessEnv";
+	readonly mathKind: MathModes;
+	readonly inMath = true;
+	readonly strictlyInMath = false;
+	readonly OneLineMath: boolean;
+	readonly MultiLineMath: boolean;
+
+	constructor(mathKind: MathModes) {
+		this.mathKind = mathKind;
+		this.OneLineMath = mathKind.kind === "inlineMath" || mathKind.kind === "inlineBlockMath";
+		this.MultiLineMath = mathKind.kind === "blockMath" || mathKind.kind === "codeMath";
+	}
+}
+
+export class OffMode implements BaseMode {
+	readonly kind = "off";
+	readonly inMath = false;
+	readonly strictlyInMath = false;
+	readonly OneLineMath = false;
+	readonly MultiLineMath = false;
+}
 
 export class Mode {
 	text: boolean;
@@ -147,13 +240,6 @@ export class Mode {
 		this.code = code;
 		this.textEnv = textEnv;
 		this.snippetlessEnv = snippetlessEnv;
-	}
-
-	/**
-	 * Whether the state is inside an equation bounded by $ or $$ delimeters.
-	 */
-	inEquation(): boolean {
-		return this.inlineMath || this.blockMath;
 	}
 
 	/**

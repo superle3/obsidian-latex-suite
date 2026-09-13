@@ -42,7 +42,7 @@ const bracket_delimiters = {
 	"\\{": "\\}",
 	// these don't neccessarily have to be paired: but they often do so we treat them like a pair.
 	"\\left<": "\\right>",
-	"\\langle ": "\\rangle",
+	"\\langle": "\\rangle",
 	"\\lvert": "\\rvert",
 	"\\lVert": "\\rVert",
 	"\\right\\lt": "\\right\\gt",
@@ -378,7 +378,7 @@ function highlightCursorBrackets(view: EditorView) {
 	const ranges = selection.ranges;
 	const ctx = getContextPlugin(view);
 
-	if (!ctx.mode.inMath()) {
+	if (!ctx.mode.inMath) {
 		return Decoration.none;
 	}
 

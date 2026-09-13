@@ -10,36 +10,11 @@ import {
 	getCloseBracket,
 	stackResolveNodeIterate,
 } from "src/utils/editor_utils";
-import { Mode } from "./options";
+import { OffMode, SnippetlessEnvMode, TextEnvMode, TextMode, type CursorModes } from "./options";
 import type { Environment } from "../snippets/environment";
-import { getLatexSuiteConfig } from "../snippets/codemirror/config";
-import { syntaxTree } from "@codemirror/language";
 import type { SyntaxNode } from "@lezer/common";
 import { allTextAreas, type MacroArea, snippetLessArea } from "./default_text_areas";
-import { getMathBoundsPlugin } from "./mathbounds";
-
-const OPEN_INLINE_MATH_NODE =
-	"formatting_formatting-math_formatting-math-begin_keyword_math";
-const CLOSE_INLINE_MATH_NODE =
-	"formatting_formatting-math_formatting-math-end_keyword_math_math-";
-
-const OPEN_DISPLAY_MATH_NODE =
-	"formatting_formatting-math_formatting-math-begin_keyword_math_math-block";
-const CLOSE_DISPLAY_MATH_NODE =
-	"formatting_formatting-math_formatting-math-end_keyword_math_math-";
-export const open_math_nodes = new Set([
-	OPEN_INLINE_MATH_NODE,
-	OPEN_DISPLAY_MATH_NODE,
-]);
-export const close_math_nodes = new Set([
-	CLOSE_INLINE_MATH_NODE,
-	CLOSE_DISPLAY_MATH_NODE,
-]);
-const OPEN_CODEBLOCK_NODE =
-	"HyperMD-codeblock_HyperMD-codeblock-begin_HyperMD-codeblock-begin-bg_HyperMD-codeblock-bg";
-const CLOSE_CODEBLOCK_NODE =
-	"HyperMD-codeblock_HyperMD-codeblock-bg_HyperMD-codeblock-end_HyperMD-codeblock-end-bg";
-const CODE_NODE = "inline-code";
+import { BoundKind, getMathBoundsPlugin, type MathBound } from "./mathbounds";
 
 export type StackOutput = (
 	| {
@@ -66,12 +41,13 @@ export type CMBound = { from: number; to: number };
 export class Context implements PluginValue {
 	view!: EditorView;
 	state!: EditorState;
-	mode!: Mode;
+	mode!: CursorModes;
 	pos!: number;
 	ranges!: SelectionRange[];
 	codeblockLanguage: string | null = null;
-	boundsCache!: Map<number, Bounds | null>;
-	innerBoundsCache!: Map<number, Bounds | null>;
+	mathBoundsCache!: Map<number, MathBound | null>;
+	codeblockBoundsCache!: Map<number, Bounds | null>;
+	innerBoundsCache!: Map<number, StackOutput & {kind: "math"} | null>;
 	shouldUpdate: boolean = false;
 
 	constructor(view: EditorView) {
@@ -80,18 +56,9 @@ export class Context implements PluginValue {
 
 	disableMath() {
 		this.shouldUpdate = false;
-		this.boundsCache.clear();
+		this.mathBoundsCache.clear();
 		this.innerBoundsCache.clear();
-		this.mode = new Mode({
-			text: false,
-			inlineMath: false,
-			blockMath: false,
-			codeMath: false,
-			codeBlock: false,
-			code: false,
-			textEnv: false,
-			snippetlessEnv: false,
-		})
+		this.mode = new OffMode();
 		const mathBounds = getMathBoundsPlugin(this.view, false);
 		mathBounds.reset();
 	}
@@ -119,58 +86,28 @@ export class Context implements PluginValue {
 		this.state = state;
 		this.pos = sel.main.to;
 		this.ranges = Array.from(sel.ranges).reverse(); // Last to first
-		this.mode = new Mode({
-			text: false,
-			inlineMath: false,
-			blockMath: false,
-			codeMath: false,
-			codeBlock: false,
-			code: false,
-			textEnv: false,
-			snippetlessEnv: false,
-		});
-		this.boundsCache = new Map();
+		this.mathBoundsCache = new Map();
 		this.innerBoundsCache = new Map();
 		this.codeblockLanguage = null;
-
-		const codeBlockInfo = langIfWithinCodeblock(state);
-		const codeblockLanguage = codeBlockInfo?.codeblockLanguage ?? null;
-		const inCodeBlock = codeblockLanguage !== null;
-		const inCode = inCodeBlock ? false : withingCode(state)
-		this.mode.code = inCode;
-
-		const settings = getLatexSuiteConfig(state);
-		const forceMath =
-			inCodeBlock &&
-			settings.forceMathLanguages.contains(codeblockLanguage);
-		this.mode.codeMath = forceMath;
-		this.mode.codeBlock = inCodeBlock && !forceMath ? codeblockLanguage : false;
-		if (inCodeBlock && this.mode.codeBlock !== false) {
-			this.codeblockLanguage = codeblockLanguage;
-			this.boundsCache.set(this.pos, codeBlockInfo);
-		}
-
+		this.mode = this.createMode(view);
+	}
+	
+	createMode(view: EditorView): CursorModes {
+		const state = view.state;
 		// first, check if math mode should be "generally" on
 		const mathBoundsCache = getMathBoundsPlugin(view);
-		const inMath = mathBoundsCache.inMathBound(state, this.pos);
-
-		if (inMath !== null) {
-			this.mode.blockMath = inMath.mode === MathMode.BlockMath;
-			this.mode.inlineMath = inMath.mode === MathMode.InlineMath;
-			this.boundsCache.set(this.pos, inMath);
-		}
-
-		if (inMath) {
+		const bound = mathBoundsCache.inBound(state, this.pos);
+		if (bound === null) {
+			return new TextMode();
+		} else if (bound.kind === BoundKind.MathBound) {
+			this.mathBoundsCache.set(this.pos, bound);
 			const textEnv = this.inTextEnvironment();
-			if (textEnv === "text") {
-				this.mode.textEnv = true;
-			} else if (textEnv === "none") {
-				this.mode.snippetlessEnv = true;
+			if (textEnv !== null) {
+				return textEnv;
 			}
+			return bound.mode;
 		}
-
-		this.mode.text = !inCodeBlock && !inMath;
-
+		return bound.mode;
 	}
 
 	*getEnvNames(pos: number = this.pos): Generator<StackOutput, void, unknown> {
@@ -275,10 +212,10 @@ export class Context implements PluginValue {
 		return null;
 	}
 
-	isWithinEnvironment<T extends Environment>(pos: number, envs: T | T[]): T & Bounds | null {
-		if (!this.mode.inMath()) return null;
+	isWithinEnvironment<T extends Environment>(pos: number, envs: T[]): T & Bounds | null {
+		if (!this.mode.inMath || envs.length === 0) return null;	
 
-		const bounds = this.getInnerBounds();
+		const bounds = this.getInnerMathBounds();
 		if (!bounds) return null;
 
 		const {inner_start: start, inner_end: end} = bounds;
@@ -288,9 +225,6 @@ export class Context implements PluginValue {
 		// so now pos must be relative to the start in order to be any useful
 		pos -= start;
 
-		if (!Array.isArray(envs)) {
-			envs = [envs];
-		}
 		outer_loop: for (const env of envs) {
 			const openBracket = env.openSymbol.slice(-1);
 			const closeBracket = getCloseBracket(openBracket);
@@ -345,55 +279,48 @@ export class Context implements PluginValue {
 		return null;
 	}
 
-	inTextEnvironment(): "text" | "none" | null {
+	inTextEnvironment(): TextEnvMode | SnippetlessEnvMode | null {
+		const bounds = this.getMathBounds();
+		if (!bounds) return null;
 		const result = this.isWithinMacros(this.pos, allTextAreas)
 		if (!result) return null;
 		const openSymbol = result.name;
 		if (snippetLessArea.some(macro => macro.name === openSymbol)) {
-			return "none"
+			return new SnippetlessEnvMode(bounds.mode);
 		} else {
-			return "text"
+			return new TextEnvMode(bounds.mode);
 		}
 	}
 
-	getBounds(pos: number = this.pos): Bounds | null {
+	getMathBounds(pos: number = this.pos): MathBound | null {
 		// yes, I also want the cache to work over the produced range instead of just that one through
 		// a BTree or the like, but that'd be probably overkill
-		const cached = this.boundsCache.get(pos);
+		const cached = this.mathBoundsCache.get(pos);
 		if (cached !== undefined) {
 			return cached;
 		}
 
-		let bounds: Bounds | null;
-		if (this.mode.codeMath) {
-			// means a codeblock language triggered the math mode -> use the codeblock bounds instead
-			bounds = getCodeblockBounds(this.state, pos);
-		} else {
-			bounds = getMathBoundsPlugin(this.view).inMathBound(this.state, pos);
-		}
+		const bounds = getMathBoundsPlugin(this.view).inMathBound(this.state, pos)
 
-		this.boundsCache.set(pos, bounds);
+		this.mathBoundsCache.set(pos, bounds);
 		return bounds;
 	}
 
 	// Accounts for equations within text environments, e.g. $$\text{... $...$}$$
-	getInnerBounds(pos: number = this.pos): Bounds | null {
-		let bounds: Bounds | null;
+	getInnerMathBounds(pos: number = this.pos): StackOutput & {kind: "math"} | null {
 		const cached = this.innerBoundsCache.get(pos);
 		if (cached !== undefined) {
 			return cached;
 		}
-		if (this.mode.codeMath) {
-			// means a codeblock language triggered the math mode -> use the codeblock bounds instead
-			bounds = this.getBounds(pos);
-		} else {
-			bounds = getInnerEquationBounds(this.view);
+		const parsed = this.getEnvNames(pos);
+		for (const result of parsed) {
+			if (result.kind === "math") {
+				this.innerBoundsCache.set(pos, result);
+				return result;
+			}
 		}
-		this.innerBoundsCache.set(pos, bounds);
-
-		return bounds;
+		return null;
 	}
-
 }
 
 export const contextPlugin = ViewPlugin.fromClass(Context);
@@ -424,130 +351,9 @@ export function isMacroArgumentCount(stack: Readonly<MacroStackOutput>, macros: 
 	return stack
 }
 
-export enum MathMode {
+export const enum MathMode {
 	InlineMath,
-	BlockMath,
+	BlockDisplayMath,
+	InlineDisplayMath,
 	CodeMath
 }
-
-// Accounts for equations within text environments, e.g. $$\text{... $...$}$$
-const getInnerEquationBounds = (view: EditorView, pos?: number ):Bounds | null => {
-	if (!pos) pos = view.state.selection.main.to;
-	const bounds = getMathBoundsPlugin(view).inMathBound(view.state, pos);
-	if (!bounds) return null;
-	let text = view.state.sliceDoc(bounds.inner_start, bounds.inner_end);
-
-	// ignore \$
-	text = text.replaceAll("\\$", "\\R");
-
-	const left = text.lastIndexOf("$", pos - 1);
-	const right = text.indexOf("$", pos);
-
-	if (left === -1 || right === -1) return bounds;
-
-	return {
-		inner_start: left + 1,
-		inner_end: right,
-		outer_start: left,
-		outer_end: right + 1,
-	};
-};
-
-/**
- * Figures out where this codeblock starts and where it ends.
- *
- * **Note:** If you intend to use this directly, check out Context.getBounds instead, which caches and also takes care of codeblock languages which should behave like math mode.
- */
-const getCodeblockBounds = (
-	state: EditorState,
-	pos: number = state.selection.main.from,
-): Bounds | null => {
-	const bounds = getCodeblockBoundNodes(state, pos);
-	if (!bounds) return null;
-	const { begin: blockBegin, end: blockEnd } = bounds;
-	return {
-		inner_start: blockBegin.to,
-		inner_end: blockEnd.from,
-		outer_start: blockBegin.from,
-		outer_end: blockEnd.to,
-	};
-};
-
-const getCodeblockBoundNodes = (
-	state: EditorState,
-	pos: number = state.selection.main.from,
-): { begin: SyntaxNode; end: SyntaxNode } | null => {
-	const tree = syntaxTree(state);
-	const cursor = tree.cursor();
-	cursor.childBefore(pos);
-
-	if (!cursor.name.contains("codeblock")) {
-		return null;
-	}
-	// If we're directly on a codeblock than it should be treated as not being in a codeblock.
-	// since childBefore, we only have to check if pos is not outside the opening node.
-	if (
-		(cursor.name === OPEN_CODEBLOCK_NODE && pos <= cursor.to) ||
-		cursor.name === CLOSE_CODEBLOCK_NODE
-	) {
-		return null;
-	}
-	do {
-		if (cursor.name === OPEN_CODEBLOCK_NODE) {
-			break;
-		}
-	} while (cursor.prev());
-	const begin = cursor.node;
-	if (!begin) {
-		return null;
-	}
-	cursor.childAfter(pos);
-	do {
-		if (cursor.name === CLOSE_CODEBLOCK_NODE) {
-			break;
-		}
-	} while (cursor.next());
-	const end = cursor.node;
-	if (!end || end.name !== CLOSE_CODEBLOCK_NODE) {
-		return null;
-	}
-	return { begin, end };
-};
-
-type CodeblockLangInfo = Bounds & { codeblockLanguage: string };
-const langIfWithinCodeblock = (
-	state: EditorState,
-): CodeblockLangInfo | null => {
-	const pos = state.selection.ranges[0].from;
-	const coddeblockBounds = getCodeblockBoundNodes(state, pos);
-	if (!coddeblockBounds) return null;
-	const { begin: codeblockBegin, end: codeblockEnd } = coddeblockBounds;
-
-	// extract the language
-	// codeblocks may start and end with an arbitrary number of backticks
-	const language = getLangFromCodeblockNode(state, codeblockBegin);
-
-	return {
-		inner_start: codeblockBegin.to,
-		inner_end: codeblockEnd.from,
-		outer_start: codeblockBegin.from,
-		outer_end: codeblockEnd.to,
-		codeblockLanguage: language,
-	};
-};
-
-function getLangFromCodeblockNode(
-	state: EditorState,
-	node: SyntaxNode,
-): string {
-	return state
-		.sliceDoc(node.from, node.to)
-		.replace(/`+|~+/g, "")
-		.split(" ")[0];
-}
-
-const withingCode = (state: EditorState): boolean => {
-	const pos = state.selection.main.head;
-	const tree = syntaxTree(state);
-	return tree.resolveInner(pos, -1).name.contains(CODE_NODE);
-};

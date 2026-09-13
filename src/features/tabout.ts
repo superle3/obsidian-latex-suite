@@ -80,9 +80,7 @@ const isUnmatchedRightCommand = (tokens: Token[], index: number): boolean => {
 
 
 export const tabout = (view: EditorView, ctx: Context): boolean => {
-	if (!ctx.mode.inMath()) return false;
-
-	const bounds = ctx.getBounds();
+	const bounds = ctx.getMathBounds();
 	if (!bounds) return false;
     const { inner_start, inner_end, outer_end, outer_start } = bounds;
 	if (outer_end <= ctx.pos) return false;

@@ -1,12 +1,14 @@
 import { EditorView } from "@codemirror/view";
 import { SelectionRange } from "@codemirror/state";
-import { findMatchingBracket, getOpenBracket } from "src/utils/editor_utils";
+import { findMatchingBracket } from "src/utils/editor_utils";
 import { queueSnippet } from "src/snippets/codemirror/snippet_queue_state_field";
 import { expandSnippets } from "src/snippets/snippet_management";
 import { autoEnlargeBrackets } from "./auto_enlarge_brackets";
 import { Context, getContextPlugin } from "src/editor_context/context";
 import { getLatexSuiteConfig } from "src/snippets/codemirror/config";
 import { ArrayNode, emptyInsertOptions, TabstopNode, TextNode } from "src/snippets/luasnip_api/node";
+import { pairBrackets, traverseTree } from "src/editor_extensions/highlight_brackets";
+import { EquationText } from "src/utils/tokenizer";
 
 
 export const runAutoFraction = (view: EditorView): boolean => {
@@ -35,16 +37,19 @@ export const runAutoFractionCursor = (view: EditorView, ctx: Context, range: Sel
 	const {from, to} = range;
 
 	// Don't run autofraction in excluded environments
-	for (const env of settings.autofractionExcludedEnvs) {
-		if (ctx.isWithinEnvironment(to, env)) {
-			return false;
-		}
+	const envs = settings.autofractionExcludedEnvs
+	if (ctx.isWithinEnvironment(to, envs)) {
+		return false;
 	}
 
 	// Get the bounds of the equation
-	const result = ctx.getBounds();
-	if (!result) return false;
-	const eqnStart = result.inner_start;
+	const innerBound = ctx.getInnerMathBounds(range.to)
+	const outerBound = ctx.getMathBounds(range.to)
+	const bound = innerBound ? innerBound : outerBound!;
+	if (!bound) return false;
+	const node = "node" in bound ? bound.node : bound.tree;
+	if (!node) return false;
+	const eqnStart = Math.max(bound.inner_start, node.from);
 
 
 	let curLine = view.state.sliceDoc(eqnStart, to);
@@ -65,21 +70,46 @@ export const runAutoFractionCursor = (view: EditorView, ctx: Context, range: Sel
 		regex.lastIndex = 0;
 		curLine = curLine.replace(regex, "$1#$2");
 
-
-		for (let i = curLine.length - 1; i >= 0; i--) {
-			const curChar = curLine.charAt(i)
-
-			if ([")", "]", "}"].contains(curChar)) {
-				const closeBracket = curChar;
-				const openBracket = getOpenBracket(closeBracket);
-
-				const j = findMatchingBracket(curLine, i, openBracket, closeBracket, true);
-
-				if (j === null) return false;
-
-				// Skip to the beginnning of the bracket
-				i = j;
+		const doc = new EquationText(curLine, eqnStart, to)
+		const pairedBrackets = pairBrackets(traverseTree(node, doc))
+			.filter((pair) => pair.kind !== "error_open")
+			.filter(
+				(pair) =>
+					(pair.kind === "bracket" &&
+						pair.open.from >= eqnStart &&
+						pair.close.to <= to) ||
+					(pair.kind === "error_close" &&
+						pair.close.from >= eqnStart &&
+						pair.close.to <= to),
+			).sort((a, b) => -(a.close.to - b.close.to));
+		for (let i = curLine.length - 1, pairBracketIndex = 0; i >= 0; i--) {
+			const curChar = curLine.charAt(i);
+			const pairBracket = pairedBrackets[pairBracketIndex];
+			if (pairBracket && pairBracket.kind === "error_close") {
+				return false;
+			} else if (pairBracket && pairBracket.close.to === i + eqnStart + 1) {
+				// Skip to the beginning of the bracket
+				i = pairBracket.open.from - eqnStart;
+				for (pairBracketIndex = pairBracketIndex + 1; pairBracketIndex < pairedBrackets.length; pairBracketIndex++) {
+					if (pairedBrackets[pairBracketIndex].close.to <= i + eqnStart) {
+						break;
+					}
+				}
+				continue;
 			}
+
+
+			// if ([")", "]", "}"].contains(curChar)) {
+			// 	const closeBracket = curChar;
+			// 	const openBracket = getOpenBracket(closeBracket);
+
+			// 	const j = findMatchingBracket(curLine, i, openBracket, closeBracket, true);
+
+			// 	if (j === null) return false;
+
+			// 	// Skip to the beginnning of the bracket
+			// 	i = j;
+			// }
 
 
 			if (" $([{\n".concat(settings.autofractionBreakingChars).contains(curChar)) {
