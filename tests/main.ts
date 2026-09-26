@@ -6,6 +6,8 @@ import { EditorView } from "@codemirror/view";
 import { RawSnippetSchema } from "../src/snippets/parse";
 import * as v from "valibot"
 import { colorPairedBrackets, colorPairedBracketsPlugin } from "../src/editor_extensions/highlight_brackets";
+import i18next from "../src/i18n/i18n";
+import { settings_translation } from "../src/i18n/i18n";
 
 declare global {
 	interface Window {
@@ -34,7 +36,10 @@ export default class TestPlugin extends LatexSuitePlugin {
 	test = {
 		parser: fullMathParser,
 		conceal,
-		colorPairedBrackets
+		colorPairedBrackets,
+		settings_translation,
+		i18next,
+		EditorView,
 	}	
 	async onload() {
 		await super.onload();
