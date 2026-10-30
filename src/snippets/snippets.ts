@@ -65,6 +65,16 @@ type SnippetReplacementUnstableApi = {
 	range: CMBound,
 }
 
+type TriggerOptions = {
+	view: EditorView
+	range: CMBound
+}
+
+type FakeRegex = {
+	exec: (str: string, options: TriggerOptions) => RegExpExecArray | null;
+	source: string;
+}
+
 // output of replacement functions should be the output fo ReplacementOutputSchema,
 // but this would lead to false confidence as user might return something else.
 export type SnippetData<T extends SnippetType> = {
@@ -73,9 +83,9 @@ export type SnippetData<T extends SnippetType> = {
 		replacement: ArrayNode | ((selection: string, api: SnippetReplacementUnstableApi) => unknown);
 	};
 	regex: {
-		trigger: RegExp;
+		trigger: FakeRegex;
 		replacement: ArrayNode | ((match: RegExpExecArray, api: SnippetReplacementUnstableApi) => unknown);
-		triggerAfter?: RegExp;
+		triggerAfter?: FakeRegex;
 	};
 	string: {
 		trigger: string;
@@ -284,14 +294,14 @@ export class RegexSnippet extends Snippet<"regex"> {
 		this.data.triggerAfter = triggerAfter;
 	}
 
-	process({effectiveLine,range, sel, effectiveLineAfter, view}: ProccesArgs): ProcessSnippetResult {
+	process({effectiveLine, range, sel, effectiveLineAfter, view}: ProccesArgs): ProcessSnippetResult {
 		const hasSelection = !!sel.original;
 		// non-visual snippets only run when there is no selection
 		if (hasSelection) { return null; }
-
-		const result = this.trigger.exec(effectiveLine);
+		const triggerOptions: TriggerOptions = { view, range: range.original };
+		const result = this.trigger.exec(effectiveLine, triggerOptions);
 		if (result === null) { return null; }
-		const afterResult = this.data.triggerAfter?.exec(effectiveLineAfter());
+		const afterResult = this.data.triggerAfter?.exec(effectiveLineAfter(), triggerOptions);
 		if (this.data.triggerAfter && afterResult === null) { return null; }
 		const triggerPos = result.index;
 		const triggerEndPos = afterResult
