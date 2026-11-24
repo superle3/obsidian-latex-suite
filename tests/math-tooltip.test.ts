@@ -155,14 +155,24 @@ describe("math preview", () => {
 	it("should show tooltip fully in table", async () => {
 		const result = await evalInObsidian({
 			contextId,
-			callback: async ({ lib: {view, plugin}, context }) => {
+			callback: async ({ lib: {view, plugin, waitUntil}, context }) => {
 				plugin.settings.mathPreviewPositionIsAbove = true;
 				await plugin.saveSettings();
 				plugin.ensureEditorMode("preview");
 				view.setDoc("|$E=mc^2$|$E=mc^2$|\n|---|---|\n|$E=mc^2$|$E=mc^2$|\n", "|$E=".length);
 				await nextFrame();
 				plugin.getActiveEditorView()?.focus();
-				const tooltips = activeDocument.querySelectorAll("div.cm-tooltip-cursor.cm-tooltip");
+				const tooltips = await new Promise<NodeListOf<Element>>((resolve, reject) => {
+					waitUntil({
+						predicate: () => {
+							const tooltips = activeDocument.querySelectorAll("div.cm-tooltip-cursor.cm-tooltip");
+							if (tooltips.length > 0) {
+								resolve(tooltips);
+							}
+							return tooltips.length > 0
+						}
+					}).catch(() => reject())
+				})
 				return [tooltips.length, await context.isVisible(tooltips.item(0), 1)]
 			},
 		});

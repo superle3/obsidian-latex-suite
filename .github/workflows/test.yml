@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Test
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  # Allow triggering the workflow manually and in check_for_new_obsidian.yaml
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  test-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          # Enable these if you want to test your plugin on different platforms
+          # - windows-latest
+          # - macos-latest
+    runs-on: ${{ matrix.os }}
+    name: Test ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run build
+
+      # On linux runners we need to set up a virtual graphics stack for Obsidian. Here we
+      # use xvfb as a virtual display server and herbstluftwm as the window manager. (You
+      # can sometimes get by without the window manager, but some Obsidian features won't
+      # work properly wihtout it.)
+      - if: ${{ matrix.os == 'ubuntu-latest' }}
+        name: "Setup virtual graphics"
+        run: |
+            # Some hacks to speed up apt install
+            sudo rm -rf /etc/apt/sources.list.d/*.list
+            echo "set man-db/auto-update false" | sudo debconf-communicate
+            sudo dpkg-reconfigure man-db
+
+            sudo apt-get update -q
+            sudo apt-get install -q herbstluftwm dzen2 x11-xserver-utils
+
+            export DISPLAY=:99
+            echo "DISPLAY=$DISPLAY" >> "$GITHUB_ENV"
+            Xvfb $DISPLAY -screen 0 1280x1024x24 +extension GLX -noreset &
+            sleep 1
+            herbstluftwm &
+            sleep 1
+
+      - name: Run e2e tests
+        run: npm test
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OBSIDIAN_VERSION: public-latest
+          OBSIDIAN_INSTALLER_VERSION: public-latest
+          CI_DISABLE_SANDBOX: "${{ case(matrix.os == 'ubuntu-latest', '1', '') }}"
+
+  # This makes it easier to require all tests to pass on PRs. Just set the final "check" job as
+  # required in the GitHub repo settings instead of having to manually set every matrix combination
+  check:
+    if: always()
+    needs: [test-desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all tests passed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

@@ -79,6 +79,10 @@ const watchCopyFile = (src: string, dest: string) => {
 	if (path.resolve(src) === path.resolve(dest)) {
 		return () => {};
 	}
+	const dirpath = path.join(dest, "..");
+	if (!fs.existsSync(dirpath)) {
+		fs.mkdirSync(dirpath, { recursive: true });
+	}
 	const debouncedCopy = debouncer((_) => {
 		console.log(`Copied ${src} to ${dest}`);
 		fs.copyFileSync(src, dest);
@@ -110,6 +114,7 @@ if (dev) {
 } else if (test) {
 	args.entryPoints = ["tests/main.ts"]
 	args.outfile = "dist/dev/main.js"
+	fs.mkdirSync("dist/dev", { recursive: true });
 	fs.copyFileSync("manifest.json", "dist/dev/manifest.json");
 	fs.copyFileSync("styles.css", "dist/dev/styles.css");
 	await esbuild.build(args).catch(() => process.exit(1));
