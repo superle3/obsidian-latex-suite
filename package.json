@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-latex-suite",
-	"version": "1.14.5",
+	"version": "1.14.6-0",
 	"description": "Make typesetting LaTeX math as fast as handwriting through snippets, text expansion, and editor enhancements",
 	"main": "main.js",
 	"types": "src/api.d.ts",
@@ -41,7 +41,7 @@
 		"@lezer/lr": "^1.4.10",
 		"codemirror": "^6.0.0",
 		"i18next": "^26.4.0",
-		"obsidian": "^1.14.4"
+		"obsidian": "1.14.4"
 	},
 	"devDependencies": {
 		"@codemirror/language": "^6.12.4",
@@ -55,11 +55,11 @@
 		"esbuild": "^0.28.2",
 		"esbuild-plugin-inline-import": "^1.0.2",
 		"eslint": "^9.39.2",
-		"eslint-plugin-obsidianmd": "^0.4.2",
+		"eslint-plugin-obsidianmd": "0.6.0",
 		"globals": "^17.3.0",
 		"jiti": "^2.7.0",
-		"obsidian-integration-testing": "^17.5.1",
-		"obsidian-typings": "^6.50.0",
+		"obsidian-integration-testing": "18.1.0",
+		"obsidian-typings": "6.64.0",
 		"remark-parse": "^11.0.0",
 		"remark-stringify": "^11.0.0",
 		"stylelint": "^17.14.1",
