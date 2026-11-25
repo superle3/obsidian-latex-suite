@@ -10,7 +10,7 @@ function exec(command: string) {
 	execSync(command, { stdio: "inherit" });
 }
 exec("npm ci");
-exec("git push HEAD^");
-const upstream = process.env.GITHUB_UPSTREAM_REPO ?? "upstream"
-exec(`git push ${upstream} ${latestTag}`);
+// exec("git push ");
+// const upstream = process.env.GITHUB_UPSTREAM_REPO ?? "upstream"
+// exec(`git push ${upstream} ${latestTag}`);
 
