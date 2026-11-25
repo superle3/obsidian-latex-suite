@@ -6,5 +6,5 @@ function exec(command: string) {
 }
 
 exec(
-	"npm install obsidian-integration-testing@latest eslint-plugin-obsidianmd@latest obsidian-typings@latest obsidian@latest",
+	"npm install --save-exact obsidian-integration-testing@latest eslint-plugin-obsidianmd@latest obsidian-typings@latest obsidian@latest",
 );
