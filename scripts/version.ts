@@ -1,9 +1,14 @@
 import { execSync } from "child_process";
 import { readFileSync, writeFileSync } from "fs";
 
-execSync("npm test");
-execSync("npm run lint");
-execSync("npm run build");
+function exec(command: string) {
+	console.log(`> ${command}`);
+	execSync(command, { stdio: "inherit" });
+}
+
+exec("npm test");
+exec("npm run lint");
+exec("npm run build");
 const targetVersion = process.env.npm_package_version;
 if (!targetVersion) {
 	console.error("Error: target version not specified. Please set the npm_package_version environment variable.");
@@ -36,5 +41,5 @@ if (versions[highestVersion] !== minAppVersion) {
 	writeFileSync("versions.json", JSON.stringify(versions, null, "\t"));
 }
 
-execSync("npm install");
-execSync("git add manifest.json versions.json");
+exec("npm install");
+exec("git add manifest.json versions.json");
