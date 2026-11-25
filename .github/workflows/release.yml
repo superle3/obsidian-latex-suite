@@ -10,7 +10,13 @@ env:
   PLUGIN_NAME: obsidian-latex-suite # Change this to match the id of your plugin.
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+  lint:
+    uses: ./.github/workflows/lint.yml
+
   build:
+    needs: [lint, test]
     runs-on: ubuntu-latest
     permissions:
         id-token: write
@@ -55,3 +61,6 @@ jobs:
             ./manifest.json
             ./styles.css
             ./${{ env.PLUGIN_NAME }}.zip
+      - name: Push commit of tag
+        run: |
+          git push origin ${{ github.ref_name }}
